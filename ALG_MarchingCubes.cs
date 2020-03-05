@@ -15,9 +15,9 @@ namespace ALG_MarchingCubes_GPU
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddGeometryParameter("Geometries", "G", "Geometries", GH_ParamAccess.list);
-            pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item,1.2);
+            pManager.AddNumberParameter("BoundaryRatio", "B", "BoundaryRatio", GH_ParamAccess.item,2);
+            pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item, 1);
             pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item,5.0);
-            pManager.AddIntegerParameter("Count", "Count", "Count", GH_ParamAccess.item);
             pManager.AddBooleanParameter("GPU", "GPU", "GPU", GH_ParamAccess.item,false);
         }
 
@@ -33,24 +33,35 @@ namespace ALG_MarchingCubes_GPU
             List<double> Weights = new List<double>();
             List<Point3d> samplePoints = new List<Point3d>();
             double scale = 1.0;
-            double size = 1.0;
+            double boundaryRatio = 2.0;
             double isovalue = 5.0;
-            int count = 0;
             bool gpu = false;
 
             DA.GetDataList("Geometries",  geos);
+            DA.GetData("BoundaryRatio", ref boundaryRatio);
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
-            DA.GetData("Count", ref count);
             DA.GetData("GPU", ref gpu);
 
             //建立基box
-            Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, scale);
+            Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
             Plane plane = new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.YAxis);
-            Interval interval = new Interval(0, 1);
+
+            //求三个方向上单元的数量
+            Interval xD = box1.X;
+            Interval yD = box1.Y;
+            Interval zD = box1.Z;
+
+            int xCount = (int)Math.Abs(Math.Round((xD.T1 - xD.T0), MidpointRounding.AwayFromZero));
+            int yCount = (int)Math.Abs(Math.Round((yD.T1 - yD.T0), MidpointRounding.AwayFromZero));
+            int zCount = (int)Math.Abs(Math.Round((zD.T1 - zD.T0), MidpointRounding.AwayFromZero));
+
+            Interval intervalX = new Interval(0, xD.Length);
+            Interval intervalY = new Interval(0, yD.Length);
+            Interval intervalZ = new Interval(0, zD.Length);
 
             //建立映射目标box
-            Box box2 = new Box(plane, interval, interval, interval);
+            Box box2 = new Box(plane, intervalX, intervalY, intervalZ);
 
             //开始映射
             for (int i = 0; i < geos.Count; i++)
@@ -58,14 +69,7 @@ namespace ALG_MarchingCubes_GPU
                 new_geos.Add(BasicFunctions.BoxMapping(box1, box2, geos[i]));
             }
 
-            ////求三个方向上单元的数量
-            //Interval xD = box1.X;
-            //Interval yD = box1.Y;
-            //Interval zD = box1.Z;
 
-            //int xCount = (int)Math.Abs(Math.Round((xD.T1 - xD.T0)/ size, MidpointRounding.AwayFromZero));
-            //int yCount = (int)Math.Abs(Math.Round((yD.T1 - yD.T0) / size, MidpointRounding.AwayFromZero));
-            //int zCount = (int)Math.Abs(Math.Round((zD.T1 - zD.T0) / size, MidpointRounding.AwayFromZero));
 
             //转换几何数据为点数据
             samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
@@ -76,14 +80,14 @@ namespace ALG_MarchingCubes_GPU
             if (gpu == false)
             {
                 //开始计算MC
-                for (int X = 0; X < count; X++)
+                for (int X = 0; X < xCount; X++)
                 {
-                    for (int Y = 0; Y < count; Y++)
+                    for (int Y = 0; Y < yCount; Y++)
                     {
-                        for (int Z = 0; Z < count; Z++)
+                        for (int Z = 0; Z < zCount; Z++)
                         {
                             List<Point3d> pts = new List<Point3d>();
-                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * (1.0 / count), Y * (1.0 / count), Z * (1.0 / count), (1.0 / count), samplePoints, Weights);
+                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * scale, Y *scale, Z* scale, scale, samplePoints, Weights);
                             if (pts != null)
                             {
                                 foreach (var item in pts)
@@ -95,12 +99,7 @@ namespace ALG_MarchingCubes_GPU
                     }
                 }
             }
-            else
-            {
-
-            }
-
-         
+            else { }
 
             Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
             GH_Mesh ghm = new GH_Mesh(mesh);

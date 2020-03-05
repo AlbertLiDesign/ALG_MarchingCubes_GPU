@@ -80,14 +80,16 @@ namespace ALG_MarchingCubes_GPU
             double Offset = 0.0;
             int flag = 0;
             int EdgeFlag = 0;
+
+            //生成每个Box的模型
             for (int i = 0; i < 8; i++)
             {
-                //计算CubeValue
+                //计算CubeValue，即每个box的8个顶点的iso值
                 CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
                   fy + Vertices[i, 1] * Scale,
                   fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
 
-                //判定顶点状态
+                //判定顶点状态，与用户指定的iso值比对
                 if (CubeValues[i] <= isovalue)
                 {
                     flag |= 1 << i;
@@ -105,8 +107,9 @@ namespace ALG_MarchingCubes_GPU
             {
                 if ((EdgeFlag & (1 << i)) != 0) //如果在这条边上有交点
                 {
-                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);
+                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);//获得所在边的点的位置的系数
 
+                    //获取边上顶点的坐标
                     EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
                     EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
                     EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
