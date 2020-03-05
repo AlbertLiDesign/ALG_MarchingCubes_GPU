@@ -59,6 +59,26 @@ namespace ALG_MarchingCubes_GPU
             geo2 = geo2.Transform(gh_Transform.Value);
             return geo2;
         }
+        public static IGH_GeometricGoo BoxTrans(Box box1, Box box2, IGH_GeometricGoo geo)
+        {
+
+            if (!box1.IsValid || !box2.IsValid)
+            {
+                return null;
+            }
+            Plane plane1 = box1.Plane;
+            Plane plane2 = box2.Plane;
+            plane1.Origin = box1.Center;
+            plane2.Origin = box2.Center;
+            ITransform item = new Orientation(plane1, plane2);
+            GH_Transform gh_Transform = new GH_Transform();
+            gh_Transform.CompoundTransforms.Add(item);
+            gh_Transform.ClearCaches();
+
+            IGH_GeometricGoo geo2 = geo.DuplicateGeometry();
+            geo2 = geo2.Transform(gh_Transform.Value);
+            return geo2;
+        }
 
         public static List<IGH_GeometricGoo> ConvertPointsToGeo(List<Point3d> pts)
         {

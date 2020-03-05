@@ -66,10 +66,8 @@ namespace ALG_MarchingCubes_GPU
             //开始映射
             for (int i = 0; i < geos.Count; i++)
             {
-                new_geos.Add(BasicFunctions.BoxMapping(box1, box2, geos[i]));
+                new_geos.Add(BasicFunctions.BoxTrans(box1, box2, geos[i]));
             }
-
-
 
             //转换几何数据为点数据
             samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
@@ -103,7 +101,7 @@ namespace ALG_MarchingCubes_GPU
 
             Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
             GH_Mesh ghm = new GH_Mesh(mesh);
-            IGH_GeometricGoo geoResult = BasicFunctions.BoxMapping(box2, box1, ghm);
+            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(box2, box1, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
             DA.SetData(0, mesh);
