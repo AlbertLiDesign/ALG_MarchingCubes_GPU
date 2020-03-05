@@ -18,6 +18,7 @@ namespace ALG_MarchingCubes_GPU
             pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item,1.2);
             pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item,5.0);
             pManager.AddIntegerParameter("Count", "Count", "Count", GH_ParamAccess.item);
+            pManager.AddBooleanParameter("GPU", "GPU", "GPU", GH_ParamAccess.item,false);
         }
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
@@ -35,11 +36,13 @@ namespace ALG_MarchingCubes_GPU
             double size = 1.0;
             double isovalue = 5.0;
             int count = 0;
+            bool gpu = false;
 
             DA.GetDataList("Geometries",  geos);
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
             DA.GetData("Count", ref count);
+            DA.GetData("GPU", ref gpu);
 
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, scale);
@@ -70,25 +73,34 @@ namespace ALG_MarchingCubes_GPU
             //初始化网格数据
             List<Point3d> meshVs = new List<Point3d>();
 
-            //开始计算MC
-            for (int X = 0; X < count; X++)
+            if (gpu == false)
             {
-                for (int Y = 0; Y < count; Y++)
+                //开始计算MC
+                for (int X = 0; X < count; X++)
                 {
-                    for (int Z = 0; Z < count; Z++)
+                    for (int Y = 0; Y < count; Y++)
                     {
-                        List<Point3d> pts = new List<Point3d>();
-                        pts = MarchingCubes_CPU.MarchCube(isovalue, X * (1.0 / count), Y * (1.0 / count), Z * (1.0 / count), (1.0 / count), samplePoints, Weights);
-                        if (pts != null)
+                        for (int Z = 0; Z < count; Z++)
                         {
-                            foreach (var item in pts)
+                            List<Point3d> pts = new List<Point3d>();
+                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * (1.0 / count), Y * (1.0 / count), Z * (1.0 / count), (1.0 / count), samplePoints, Weights);
+                            if (pts != null)
                             {
-                                meshVs.Add(item);
+                                foreach (var item in pts)
+                                {
+                                    meshVs.Add(item);
+                                }
                             }
                         }
                     }
                 }
             }
+            else
+            {
+
+            }
+
+         
 
             Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
             GH_Mesh ghm = new GH_Mesh(mesh);
