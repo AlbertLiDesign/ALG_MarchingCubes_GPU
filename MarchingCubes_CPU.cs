@@ -10,7 +10,7 @@ using Rhino.Geometry;
 
 namespace ALG_MarchingCubes_GPU
 {
-        public class MarchingCubes_GPU
+        public class MarchingCubes_CPU
     {
         private static double[,] Vertices = new double[8, 3]
           {

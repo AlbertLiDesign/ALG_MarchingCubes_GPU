@@ -42,7 +42,7 @@ namespace ALG_MarchingCubes_GPU
             DA.GetData("Count", ref count);
 
             //建立基box
-            Box box1 = BasicFunctiosn.CreateUnionBBoxFromGeometry(geos, scale);
+            Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, scale);
             Plane plane = new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.YAxis);
             Interval interval = new Interval(0, 1);
 
@@ -52,7 +52,7 @@ namespace ALG_MarchingCubes_GPU
             //开始映射
             for (int i = 0; i < geos.Count; i++)
             {
-                new_geos.Add(BasicFunctiosn.BoxMapping(box1, box2, geos[i]));
+                new_geos.Add(BasicFunctions.BoxMapping(box1, box2, geos[i]));
             }
 
             ////求三个方向上单元的数量
@@ -65,7 +65,7 @@ namespace ALG_MarchingCubes_GPU
             //int zCount = (int)Math.Abs(Math.Round((zD.T1 - zD.T0) / size, MidpointRounding.AwayFromZero));
 
             //转换几何数据为点数据
-            samplePoints = BasicFunctiosn.ConvertGeosToPoints(new_geos);
+            samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
 
             //初始化网格数据
             List<Point3d> meshVs = new List<Point3d>();
@@ -78,7 +78,7 @@ namespace ALG_MarchingCubes_GPU
                     for (int Z = 0; Z < count; Z++)
                     {
                         List<Point3d> pts = new List<Point3d>();
-                        pts = MarchingCubes_GPU.MarchCube(isovalue, X * (1.0 / count), Y * (1.0 / count), Z * (1.0 / count), (1.0 / count), samplePoints, Weights);
+                        pts = MarchingCubes_CPU.MarchCube(isovalue, X * (1.0 / count), Y * (1.0 / count), Z * (1.0 / count), (1.0 / count), samplePoints, Weights);
                         if (pts != null)
                         {
                             foreach (var item in pts)
@@ -90,9 +90,9 @@ namespace ALG_MarchingCubes_GPU
                 }
             }
 
-            Mesh mesh = BasicFunctiosn.ExtractMesh(meshVs);
+            Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
             GH_Mesh ghm = new GH_Mesh(mesh);
-            IGH_GeometricGoo geoResult = BasicFunctiosn.BoxMapping(box2, box1, ghm);
+            IGH_GeometricGoo geoResult = BasicFunctions.BoxMapping(box2, box1, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
             DA.SetData(0, mesh);
