@@ -4,6 +4,7 @@ using Grasshopper.Kernel;
 using Rhino.Geometry;
 using Grasshopper.Kernel.Types;
 using System.Drawing;
+using System.Diagnostics;
 
 namespace ALG_MarchingCubes_GPU
 {
@@ -24,6 +25,7 @@ namespace ALG_MarchingCubes_GPU
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -42,6 +44,11 @@ namespace ALG_MarchingCubes_GPU
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
             DA.GetData("GPU", ref gpu);
+
+            Stopwatch sw = new Stopwatch();
+            
+            List<double> time = new List<double>();
+            sw.Start();
 
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
@@ -75,6 +82,11 @@ namespace ALG_MarchingCubes_GPU
             //初始化网格数据
             List<Point3d> meshVs = new List<Point3d>();
 
+            sw.Stop();
+            double ta = sw.Elapsed.TotalMilliseconds;
+           //t_all = 304ms ta = 0.0463 tb = 292.855 ms
+
+            sw.Restart();
             if (gpu == false)
             {
                 //开始计算MC
@@ -98,13 +110,21 @@ namespace ALG_MarchingCubes_GPU
                 }
             }
             else { }
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
+
+            time.Add(ta);
+            time.Add(tb);
 
             Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
             GH_Mesh ghm = new GH_Mesh(mesh);
             IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(box2, box1, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
+            mesh.UnifyNormals();
+
             DA.SetData(0, mesh);
+            DA.SetDataList(1, time);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
