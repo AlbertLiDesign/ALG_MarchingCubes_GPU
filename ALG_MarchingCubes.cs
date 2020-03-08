@@ -6,7 +6,7 @@ using Grasshopper.Kernel.Types;
 using System.Drawing;
 using System.Diagnostics;
 
-namespace ALG_MarchingCubes_GPU
+namespace ALG_MarchingCubes
 {
     public class ALG_MC : GH_Component
     {
@@ -90,6 +90,7 @@ namespace ALG_MarchingCubes_GPU
             if (gpu == false)
             {
                 //开始计算MC
+                
                 for (int X = 0; X < xCount; X++)
                 {
                     for (int Y = 0; Y < yCount; Y++)
@@ -121,7 +122,12 @@ namespace ALG_MarchingCubes_GPU
             IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(box2, box1, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
-            mesh.UnifyNormals();
+            mesh.Vertices.CombineIdentical(true, true);
+            mesh.Vertices.CullUnused();
+            mesh.Weld(3.1415926535897931);
+            mesh.FaceNormals.ComputeFaceNormals();
+            mesh.Normals.ComputeNormals();
+
 
             DA.SetData(0, mesh);
             DA.SetDataList(1, time);

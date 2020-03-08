@@ -7,14 +7,10 @@
 //using Grasshopper.Kernel.Types;
 //using Grasshopper.Kernel.Types.Transforms;
 //using Rhino.Geometry;
-//using Alea;
-//using Alea.CSharp;
-//using Alea.Parallel;
-//using Alea.CudaToolkit;
 
-//namespace ALG_MarchingCubes_GPU
+//namespace ALG_MarchingCubes
 //{
-//        public class MarchingCubes_GPU
+//    public class MarchingCubes_GPU
 //    {
 //        private static double[,] Vertices = new double[8, 3]
 //          {
@@ -66,10 +62,8 @@
 //            return (ValueDesired - Value1) / (Value2 - Value1);
 //        }
 
-//        private static void Kernel(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights)
+//        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights)
 //        {
-
-
 //            //检查权重
 //            if (Weights.Count < SamplePoints.Count)
 //            {
@@ -86,14 +80,16 @@
 //            double Offset = 0.0;
 //            int flag = 0;
 //            int EdgeFlag = 0;
+
+//            //生成每个Box的模型
 //            for (int i = 0; i < 8; i++)
 //            {
-//                //计算CubeValue
+//                //计算CubeValue，即每个box的8个顶点的iso值
 //                CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
 //                  fy + Vertices[i, 1] * Scale,
 //                  fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
 
-//                //判定顶点状态
+//                //判定顶点状态，与用户指定的iso值比对
 //                if (CubeValues[i] <= isovalue)
 //                {
 //                    flag |= 1 << i;
@@ -111,8 +107,9 @@
 //            {
 //                if ((EdgeFlag & (1 << i)) != 0) //如果在这条边上有交点
 //                {
-//                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);
+//                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);//获得所在边的点的位置的系数
 
+//                    //获取边上顶点的坐标
 //                    EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
 //                    EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
 //                    EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
@@ -134,32 +131,6 @@
 //                }
 //            }
 //            return pts;
-//        }
-//        [GpuManaged]
-//        public static void Run(int count, double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights)
-//        {
-//            var gpu = Gpu.Default;
-
-//            int size = SamplePoints.Count;
-
-//            //gridDim = 50, blockDim = 512 分配50个block，每个block 512个线程（最多1024个）
-//            var lp = new LaunchParam(50, 512);
-
-//            //分配内存
-//            int point_size = 8 * 3 * SamplePoints.Count;
-
-//            //拷贝数据进入gpu
-//            var points = gpu.Allocate<double>(3, 3);
-
-//            var arg1 = Enumerable.Range(0, Length).ToArray();
-//            var arg2 = Enumerable.Range(0, Length).ToArray();
-//            var result = new int[Length];
-
-//            gpu.Launch(Kernel, lp, result, arg1, arg2);
-
-//            var expected = arg1.Zip(arg2, (x, y) => x + y);
-
-//            Assert.That(result, Is.EqualTo(expected));
 //        }
 //    }
 //}

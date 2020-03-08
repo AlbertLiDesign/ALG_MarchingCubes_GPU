@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ALG_MarchingCubes_GPU
+namespace ALG_MarchingCubes
 {
     public class Tables
     {

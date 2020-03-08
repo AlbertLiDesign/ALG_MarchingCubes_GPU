@@ -8,7 +8,7 @@ using Grasshopper.Kernel.Types;
 using Grasshopper.Kernel.Types.Transforms;
 using Rhino.Geometry;
 
-namespace ALG_MarchingCubes_GPU
+namespace ALG_MarchingCubes
 {
         public class MarchingCubes_CPU
     {
