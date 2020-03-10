@@ -34,184 +34,91 @@ namespace ALG_MarchingCubes
           };
         private static Point3d[] EdgeVertex = new Point3d[12];
 
-        private static double GetVolumeElement(int ld, double[] Volumes, int blockId, int xCount, int yCount, int zCount)
-        {
-            var globalIdx = globalRow * ld + globalCol;
 
-            if (globalIdx < Volumes.Length)
-                return Volumes[globalIdx];
-            else
-                return 0.0;
+        #region classifyVoxel
+        //定义一个场函数，输入xyz坐标，返回一个值
+        //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
+        private static double tangle(double x, double y, double z)
+        {
+            x *= 3.0;
+            y *= 3.0;
+            z *= 3.0;
+            return (x * x * x * x - 5.0 * x * x + y * y * y * y - 5.0 * y * y + z * z * z * z - 5.0 * z * z + 11.8) * 0.2 + 0.5;
+        }
+
+        //定义一个场函数，输入一个点的xyz坐标，返回一个值
+        private static double fieldFunc(Point3d p)
+        {
+            return tangle(p.X, p.Y, p.Z);
+        }
+        //根据一维索引计算在三维grid中的位置
+        private static int[,,] calcGridPos(int i, int[,,] gridSizeShift, int[,,] gridSizeMask)
+        {
+            int a = i & gridSizeMask.GetLength(0);
+            int b = (i >> gridSizeShift.GetLength(1)) & gridSizeMask.GetLength(1);
+            int c = (i >> gridSizeShift.GetLength(2)) & gridSizeMask.GetLength(2);
+            return new int[a, b, c];
         }
         [GpuManaged]
-        public static void RunGpuPacked(double[,] a, double[,] b, double[,] c)
+        private static void classifyVoxel(int[] voxelVerts, int[] voxelOccupied, int[,,] gridSize,
+            int[,,] gridSizeShift, int[,,] gridSizeMask, int numVoxels,
+            double[,,] voxelSize, double isoValue)
         {
-            //声明三个二维数组
-            var lp = VolumeExtract();
-            var aFlat = Pack(a);
-            var bFlat = Pack(b);
-            var cFlat = new double[c.Length];
-            Gpu.Default.Launch(KernelPacked, lp, aFlat, bFlat, cFlat, a.GetLength(1), b.GetLength(1), c.GetLength(1));
-            Unpack(cFlat, c);
-        }
-        private static int DivUp(int num, int den)
-        {
-            return (num + den - 1) / den;
-        }
-        private static LaunchParam VolumeExtract(int N)
-        {
-            //假设原始数据中体素总数为 N,按照每个线程块包含Num个线程的容量定义三维线程grid
-            var grid = new Alea.dim3(DivUp(N,Num));
-            //定义三维block
-            var block = new Alea.dim3(N);
-            
-            return new LaunchParam(grid, block);
-        }
-        [GpuManaged]
-        private static void VolumeExtract_Kernel(double isovalue, List<Point3d> samplePoints, int xCount, int yCount, int zCount)
-        {
-            List<Point3d> pts = new List<Point3d>();
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
+            int i = blockId * blockDim.x + threadIdx.x;
 
-            var blockX = blockIdx.x;
+            //计算grid中的位置
+            int[,,] gridPos = calcGridPos(i, gridSizeShift, gridSizeMask);
 
-            var threadX = threadIdx.x;
-            var threadY = threadIdx.y;
-            var threadZ = threadIdx.z;
+            Point3d p = new Point3d();
 
-            int N = xCount * yCount * zCount;   //体素总数
+            p.X = -1.0f + (gridPos.GetLength(0) * voxelSize.GetLength(0));
+            p.Y = -1.0f + (gridPos.GetLength(1) * voxelSize.GetLength(1));
+            p.Z = -1.0f + (gridPos.GetLength(2) * voxelSize.GetLength(2));
 
-            for (int X = 0; X < xCount; X++)
+            //计算cube中的8个点对应的value
+            double[] field = new double[8];
+            field[0] = fieldFunc(p);
+            field[1] = fieldFunc(p + new Point3d(voxelSize.GetLength(0), 0, 0));
+            field[2] = fieldFunc(p + new Point3d(voxelSize.GetLength(0), voxelSize.GetLength(1), 0));
+            field[3] = fieldFunc(p + new Point3d(0, voxelSize.GetLength(1), 0));
+            field[4] = fieldFunc(p + new Point3d(0, 0, voxelSize.GetLength(2)));
+            field[5] = fieldFunc(p + new Point3d(voxelSize.GetLength(0), 0, voxelSize.GetLength(2)));
+            field[6] = fieldFunc(p + new Point3d(voxelSize.GetLength(0), voxelSize.GetLength(1), voxelSize.GetLength(2)));
+            field[7] = fieldFunc(p + new Point3d(0, voxelSize.GetLength(1), voxelSize.GetLength(2)));
+
+            //判定它们的状态
+            int cubeindex;
+            cubeindex = Convert.ToInt32(field[0] < isoValue);
+            cubeindex += Convert.ToInt32(field[1] < isoValue) * 2;
+            cubeindex += Convert.ToInt32(field[2] < isoValue) * 4;
+            cubeindex += Convert.ToInt32(field[3] < isoValue) * 8;
+            cubeindex += Convert.ToInt32(field[4] < isoValue) * 16;
+            cubeindex += Convert.ToInt32(field[5] < isoValue) * 32;
+            cubeindex += Convert.ToInt32(field[6] < isoValue) * 64;
+            cubeindex += Convert.ToInt32(field[7] < isoValue) * 128;
+
+            //根据点表查找状态
+            int numVerts = Tables.VertsTable[cubeindex];
+
+            if (i < numVoxels)
             {
-                for (int Y = 0; Y < yCount; Y++)
-                {
-                    for (int Z = 0; Z < zCount; Z++)
-                    {
-
-                    }
-                }
-            }
-            for (int m = 0; m < DivUp(N, Num); m++)
-            {
-                
-            }
-
-            double[] CubeValues = new double[8];
-            int flag = 0;
-
-            //计算box的8个顶点的cubeValue，判断是否为活跃volume
-            for (int i = 0; i < 8; i++)
-            {
-                //计算CubeValue，即每个box的8个顶点的iso值
-                CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
-                  fy + Vertices[i, 1] * Scale,
-                  fz + Vertices[i, 2] * Scale, samplePoints, Weights);
-
-                //判定顶点状态，与用户指定的iso值比对
-                if (CubeValues[i] <= isovalue)
-                {
-                    flag |= 1 << i;
-                }
+                voxelVerts[i] = numVerts;
+                voxelOccupied[i] = Convert.ToInt32(numVerts > 0);
             }
         }
-
-        private static double Dist(double X, double Y, double Z, List<Point3d> SamplePoints, List<double> Weights)
+        #endregion
+        #region compactVoxels
+        private static void compactVoxels(int[] compactedVoxelArray, int[] voxelOccupied, int[] voxelOccupiedScan, int numVoxels)
         {
-            double result = 0.0;
-            double Dx, Dy, Dz;
-            double sum = 0.0;
-            foreach (var item in Weights)
-            {
-                sum += item;
-            }
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
+            int i = blockId * blockDim.x + threadIdx.x;
 
-            for (int i = 0; i < SamplePoints.Count; i++)
+            if ((voxelOccupied[i] == 1) && (i < numVoxels))
             {
-                Dx = X - SamplePoints[i].X;
-                Dy = Y - SamplePoints[i].Y;
-                Dz = Z - SamplePoints[i].Z;
-
-                result += (sum * (Weights[i] / sum)) / (Dx * Dx + Dy * Dy + Dz * Dz);
+                compactedVoxelArray[voxelOccupiedScan[i]] = i;
             }
-            return result;
         }
-
-        public static double GetOffset(double Value1, double Value2, double ValueDesired)
-        {
-            if ((Value2 - Value1) == 0.0)
-                return 0.5;
-
-            return (ValueDesired - Value1) / (Value2 - Value1);
-        }
-
-        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights)
-        {
-            //检查权重
-            if (Weights.Count < SamplePoints.Count)
-            {
-                List<double> average = new List<double>();
-                for (int i = 0; i < SamplePoints.Count; i++)
-                {
-                    average.Add(1);
-                }
-                Weights = average;
-            }
-
-            List<Point3d> pts = new List<Point3d>();
-            double[] CubeValues = new double[8];
-            double Offset = 0.0;
-            int flag = 0;
-            int EdgeFlag = 0;
-
-            //生成每个Box的模型
-            for (int i = 0; i < 8; i++)
-            {
-                //计算CubeValue，即每个box的8个顶点的iso值
-                CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
-                  fy + Vertices[i, 1] * Scale,
-                  fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
-
-                //判定顶点状态，与用户指定的iso值比对
-                if (CubeValues[i] <= isovalue)
-                {
-                    flag |= 1 << i;
-                }
-            }
-            //找到哪些几条边和边界相交
-            EdgeFlag = Tables.CubeEdgeFlags[flag];
-
-
-            //如果整个立方体都在边界内，则没有交点
-            if (EdgeFlag == 0) return null;
-
-            //找出每条边和边界的相交点，找出在这些交点处的法线量
-            for (int i = 0; i < 12; i++)
-            {
-                if ((EdgeFlag & (1 << i)) != 0) //如果在这条边上有交点
-                {
-                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);//获得所在边的点的位置的系数
-
-                    //获取边上顶点的坐标
-                    EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
-                    EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
-                    EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
-                }
-            }
-
-            //画出找到的三角形
-            for (int Triangle = 0; Triangle < 5; Triangle++)
-            {
-                if (Tables.TriangleConnectionTable[flag, 3 * Triangle] < 0)
-                    break;
-
-
-                for (int Corner = 0; Corner < 3; Corner++)
-                {
-                    int Vertex = Tables.TriangleConnectionTable[flag, 3 * Triangle + Corner];
-                    Point3d pd = new Point3d(EdgeVertex[Vertex].X, EdgeVertex[Vertex].Y, EdgeVertex[Vertex].Z);
-                    pts.Add(pd);
-                }
-            }
-            return pts;
-        }
+        #endregion
     }
 }
