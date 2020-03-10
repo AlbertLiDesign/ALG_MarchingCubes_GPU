@@ -33,7 +33,7 @@ namespace ALG_MarchingCubes
         private static Point3d[] EdgeNorm = new Point3d[12];
 
 
-        public static double Dist(double X, double Y, double Z, List<Point3d> SamplePoints, List<double> Weights)
+        private static double Dist(double X, double Y, double Z, List<Point3d> SamplePoints, List<double> Weights)
         {
             double result = 0.0;
             double Dx, Dy, Dz;
@@ -54,7 +54,7 @@ namespace ALG_MarchingCubes
             return result;
         }
 
-        public static double GetOffset(double Value1, double Value2, double ValueDesired)
+        private static double GetOffset(double Value1, double Value2, double ValueDesired)
         {
             if ((Value2 - Value1) == 0.0)
                 return 0.5;
