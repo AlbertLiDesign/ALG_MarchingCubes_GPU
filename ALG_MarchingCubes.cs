@@ -19,7 +19,7 @@ namespace ALG_MarchingCubes
             pManager.AddNumberParameter("BoundaryRatio", "B", "BoundaryRatio", GH_ParamAccess.item,2);
             pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item, 1);
             pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item,5.0);
-            pManager.AddBooleanParameter("GPU", "GPU", "GPU", GH_ParamAccess.item,false);
+            pManager.AddBooleanParameter("GPU", "GPU", "GPU", GH_ParamAccess.item,true);
         }
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
@@ -110,7 +110,41 @@ namespace ALG_MarchingCubes
                     }
                 }
             }
-            else { }
+            else 
+            {
+                MarchingCubes_GPU MCgpu = new MarchingCubes_GPU();
+
+                Alea.int3 gridS = new Alea.int3();
+                gridS.x = xCount;
+                gridS.y = yCount;
+                gridS.z = zCount;
+                MCgpu.gridSize = gridS;
+
+                Alea.int3 gridSM = new Alea.int3();
+                gridSM.x = xCount - 1;
+                gridSM.y = yCount - 1;
+                gridSM.z = zCount - 1;
+                MCgpu.gridSizeMask = gridSM;
+
+                Alea.int3 gridSS = new Alea.int3();
+                gridSS.x = 0;
+                gridSS.y = xCount;
+                gridSS.z = xCount + yCount;
+                MCgpu.gridSizeShift = gridSS;
+
+                MCgpu.maxVerts = xCount * yCount * 100;
+                Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
+                voxelS.x = 1 * scale;
+                voxelS.y = 1 * scale;
+                voxelS.z = 1 * scale;
+                MCgpu.voxelSize = voxelS;
+                MCgpu.numVoxels = xCount * yCount * zCount;
+
+                MCgpu.isoValue = isovalue;
+
+                MCgpu.computeIsosurface();
+
+            }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
 
@@ -127,6 +161,7 @@ namespace ALG_MarchingCubes
             mesh.Weld(3.1415926535897931);
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
+
 
 
             DA.SetData(0, mesh);
