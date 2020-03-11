@@ -5,6 +5,7 @@ using Rhino.Geometry;
 using Grasshopper.Kernel.Types;
 using System.Drawing;
 using System.Diagnostics;
+using Alea;
 
 namespace ALG_MarchingCubes
 {
@@ -143,7 +144,6 @@ namespace ALG_MarchingCubes
                 MCgpu.isoValue = isovalue;
 
                 MCgpu.computeIsosurface();
-
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;

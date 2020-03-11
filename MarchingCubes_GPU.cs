@@ -184,7 +184,6 @@ namespace ALG_MarchingCubes
             n.Z = lerp(f0.z, f1.z, t);
             //    n = normalize(n);
         }
-        [GpuManaged]
         private void generateTriangles(double4[] pos, double4[] norm,
             int[] compactedVoxelArray, int[] numVertsScanned, Alea.int3 gridSize,
             Alea.int3 gridSizeShift, Alea.int3 gridSizeMask,
@@ -289,26 +288,135 @@ namespace ALG_MarchingCubes
         }
         #endregion
         #region computeIsosurface()
-        public int[] computeIsosurface()
+        public void computeIsosurface()
         {
             int threads = 128;
             Alea.dim3 grid = new Alea.dim3(numVoxels / threads, 1, 1);
-            Alea.dim3 block = new Alea.dim3(threads, 1, 1);
+            Alea.dim3 block = new Alea.dim3(threads, threads, threads);
 
-            if (grid.x>65535)
+            if (grid.x > 65535)
             {
                 grid.y = grid.x / 32768;
                 grid.x = 32768;
             }
 
-            Gpu gpu = Gpu.Default;
+            var deviceId = Device.Default.Id;
+            var gpu = Gpu.Get(deviceId);
+
             var lp = new LaunchParam(grid, block);
 
-            gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
-                gridSize, gridSizeShift, gridSizeMask,
-                     numVoxels, voxelSize, isoValue);
-            return d_voxelOccupied;
+            //gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
+            //    gridSize, gridSizeShift, gridSizeMask,
+            //         numVoxels, voxelSize, isoValue);
 
+        }
+        #endregion
+
+
+
+        #region matrix
+        private const int BlockSize = 32;
+        //通过指定行列搜索矩阵元素：对于一维数组构造的矩阵，将矩阵行列根据block的行列所计算出的id来找到对应元素
+        private static double GetMatrixElement(int ld, double[] matrix, int blockRow, int blockCol, int row, int col)
+        {
+            var globalRow = blockRow * BlockSize + row;
+            var globalCol = blockCol * BlockSize + col;
+            var globalIdx = globalRow * ld + globalCol;
+            if (globalIdx < matrix.Length)
+                return matrix[globalIdx];
+            else
+                return 0.0;
+        }
+        private static void SetMatrixElement(int ld, double[] matrix, int blockRow, int blockCol, int row, int col,
+    double value)
+        {
+            var globalRow = blockRow * BlockSize + row;
+            var globalCol = blockCol * BlockSize + col;
+            var globalIdx = globalRow * ld + globalCol;
+            if (globalIdx < matrix.Length)
+                matrix[globalIdx] = value;
+        }
+
+        private static int DivUp(int num, int den)
+        {
+            return (num + den - 1) / den;
+        }
+        private static void KernelPacked(double[] a, double[] b, double[] c, int colsA, int colsB, int colsC)
+        {
+            var blockRow = blockIdx.x;
+            var blockCol = blockIdx.y;
+
+            var valueC = 0.0;
+
+            var row = threadIdx.x;
+            var col = threadIdx.y;
+
+            for (var m = 0; m < DivUp(colsA, BlockSize); ++m)
+            {
+                var subA = __shared__.Array2D<double>(BlockSize, BlockSize);
+                var subB = __shared__.Array2D<double>(BlockSize, BlockSize);
+
+                subA[row, col] = GetMatrixElement(colsA, a, blockRow, m, row, col);
+                subB[row, col] = GetMatrixElement(colsB, b, m, blockCol, row, col);
+                DeviceFunction.SyncThreads();
+
+                for (var e = 0; e < BlockSize; ++e)
+                {
+                    valueC += subA[row, e] * subB[e, col];
+                }
+                DeviceFunction.SyncThreads();
+            }
+
+            SetMatrixElement(colsC, c, blockRow, blockCol, row, col, valueC);
+        }
+        private static double[] Pack(double[,] a)
+        {
+            var flat = new double[a.Length];
+            var rows = a.GetLength(0);
+            var cols = a.GetLength(1);
+            for (var i = 0; i < rows; i++)
+                for (var j = 0; j < cols; j++)
+                    flat[i * cols + j] = a[i, j];
+            return flat;
+        }
+
+        [GpuManaged]
+        private static void Unpack(double[] aFlat, double[,] a)
+        {
+            var rows = a.GetLength(0);
+            var cols = a.GetLength(1);
+            for (var i = 0; i < rows; i++)
+                for (var j = 0; j < cols; j++)
+                    a[i, j] = aFlat[i * cols + j];
+        }
+        private static LaunchParam LaunchParam(double[,] a, double[,] b, double[,] c)
+        {
+            //定义二维线程数
+            var blockSize = new Alea.dim3(BlockSize, BlockSize);
+            //定义二维block，这里DivUP是向上取整，相当于ceil操作。例如我们有矩阵A有33列，线程数为32，
+            //那么我们需要多分配一个block用来计算，因此向上取整
+            var gridSize = new Alea.dim3(DivUp(a.GetLength(0), BlockSize), DivUp(b.GetLength(1), BlockSize));
+            return new LaunchParam(gridSize, blockSize);
+        }
+        static readonly Random rng = new Random(42);
+        public static double[,] RandomMatrix(int rows, int cols)
+        {
+            var a = new double[rows, cols];
+            for (var i = 0; i < rows; ++i)
+                for (var j = 0; j < cols; ++j)
+                    a[i, j] = rng.NextDouble();
+            return a;
+        }
+        [GpuManaged]
+        public static void RunGpuPacked(double[,] a, double[,] b, double[,] c)
+        {
+            //声明三个二维数组
+            var lp = LaunchParam(a, b, c);
+            var aFlat = Pack(a);
+            var bFlat = Pack(b);
+            var cFlat = new double[c.Length];
+            Gpu.Default.Launch(KernelPacked, lp, aFlat, bFlat, cFlat, a.GetLength(1), b.GetLength(1), c.GetLength(1));
+            Unpack(cFlat, c);
         }
         #endregion
     }

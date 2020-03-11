@@ -51,6 +51,9 @@
     <Reference Include="Alea.Parallel, Version=3.0.0.0, Culture=neutral, PublicKeyToken=ba52afc3c2e933d6, processorArchitecture=MSIL">
       <HintPath>packages\Alea.3.0.4\lib\net45\Alea.Parallel.dll</HintPath>
     </Reference>
+    <Reference Include="FSharp.Core, Version=4.7.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\FSharp.Core.4.7.0\lib\net45\FSharp.Core.dll</HintPath>
+    </Reference>
     <Reference Include="GH_IO">
       <HintPath>..\Coding\Ameba\AmebaMesh\dll\Sr7\GH_IO.dll</HintPath>
       <Private>False</Private>
@@ -82,6 +85,7 @@
     <Compile Include="Tables.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
