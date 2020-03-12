@@ -143,6 +143,9 @@ namespace ALG_MarchingCubes
 
                 MCgpu.isoValue = isovalue;
 
+                MCgpu.d_voxelOccupied = new int[xCount * yCount * zCount];
+                MCgpu.d_voxelVerts = new int[xCount * yCount * zCount*8];
+
                 MCgpu.computeIsosurface();
             }
             sw.Stop();

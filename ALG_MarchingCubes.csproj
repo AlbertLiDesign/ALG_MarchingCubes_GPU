@@ -7,8 +7,8 @@
     <ProjectGuid>{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ALG_MarchingCubes_GPU</RootNamespace>
-    <AssemblyName>ALG_MarchingCubes_GPU</AssemblyName>
+    <RootNamespace>ALG_MarchingCubes</RootNamespace>
+    <AssemblyName>ALG_MarchingCubes</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -23,6 +23,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>

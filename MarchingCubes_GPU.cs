@@ -287,12 +287,12 @@ namespace ALG_MarchingCubes
             }
         }
         #endregion
-        #region computeIsosurface()
+        #region computeIsosurface
         public void computeIsosurface()
         {
             int threads = 128;
-            Alea.dim3 grid = new Alea.dim3(numVoxels / threads, 1, 1);
-            Alea.dim3 block = new Alea.dim3(threads, threads, threads);
+            Alea.dim3 grid = new Alea.dim3(numVoxels / threads, 1, 1); //block的数量，维度
+            Alea.dim3 block = new Alea.dim3(threads, threads, threads); //thread的数量，维度
 
             if (grid.x > 65535)
             {
@@ -305,9 +305,9 @@ namespace ALG_MarchingCubes
 
             var lp = new LaunchParam(grid, block);
 
-            //gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
-            //    gridSize, gridSizeShift, gridSizeMask,
-            //         numVoxels, voxelSize, isoValue);
+            gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
+                gridSize, gridSizeShift, gridSizeMask,
+                     numVoxels, voxelSize, isoValue);
 
         }
         #endregion
