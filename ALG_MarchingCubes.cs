@@ -122,9 +122,9 @@ namespace ALG_MarchingCubes
                 MCgpu.gridSize = gridS;
 
                 Alea.int3 gridSM = new Alea.int3();
-                gridSM.x = xCount - 1;
-                gridSM.y = yCount - 1;
-                gridSM.z = zCount - 1;
+                gridSM.x = MCgpu.gridSize.x - 1;
+                gridSM.y = MCgpu.gridSize.y - 1;
+                gridSM.z = MCgpu.gridSize.z - 1;
                 MCgpu.gridSizeMask = gridSM;
 
                 Alea.int3 gridSS = new Alea.int3();
@@ -133,18 +133,19 @@ namespace ALG_MarchingCubes
                 gridSS.z = xCount + yCount;
                 MCgpu.gridSizeShift = gridSS;
 
-                MCgpu.maxVerts = xCount * yCount * 100;
+                MCgpu.maxVerts = MCgpu.gridSize.x * MCgpu.gridSize.y * 100;
+
                 Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
                 voxelS.x = 1 * scale;
                 voxelS.y = 1 * scale;
                 voxelS.z = 1 * scale;
                 MCgpu.voxelSize = voxelS;
-                MCgpu.numVoxels = xCount * yCount * zCount;
+                MCgpu.numVoxels = MCgpu.gridSize.x * MCgpu.gridSize.y * MCgpu.gridSize.z;
 
                 MCgpu.isoValue = isovalue;
 
-                MCgpu.d_voxelOccupied = new int[xCount * yCount * zCount];
-                MCgpu.d_voxelVerts = new int[xCount * yCount * zCount*8];
+                MCgpu.d_voxelOccupied = new int[MCgpu.numVoxels];
+                MCgpu.d_voxelVerts = new int[MCgpu.numVoxels];
 
                 MCgpu.computeIsosurface();
             }

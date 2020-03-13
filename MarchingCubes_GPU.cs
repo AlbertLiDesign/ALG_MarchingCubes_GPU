@@ -35,27 +35,6 @@ namespace ALG_MarchingCubes
         public  int[] d_voxelOccupiedScan = null;
         public  int[] d_compVoxelArray;
 
-
-        private double[,] Vertices = new double[8, 3]
-          {
-             {0.0, 0.0, 0.0},{1.0, 0.0, 0.0},{1.0, 1.0, 0.0},{0.0, 1.0, 0.0},
-             {0.0, 0.0, 1.0},{1.0, 0.0, 1.0},{1.0, 1.0, 1.0},{0.0, 1.0, 1.0}
-           };
-        private int[,] EdgeConnection = new int[12, 2]
-          {
-             {0,1}, {1,2}, {2,3}, {3,0},
-             {4,5}, {5,6}, {6,7}, {7,4},
-             {0,4}, {1,5}, {2,6}, {3,7}
-          };
-        private double[,] EdgeDirection = new double[12, 3]
-          {
-            {1.0, 0.0, 0.0},{0.0, 1.0, 0.0},{-1.0, 0.0, 0.0},{0.0, -1.0, 0.0},
-            {1.0, 0.0, 0.0},{0.0, 1.0, 0.0},{-1.0, 0.0, 0.0},{0.0, -1.0, 0.0},
-            {0.0, 0.0, 1.0},{0.0, 0.0, 1.0},{ 0.0, 0.0, 1.0},{0.0, 0.0, 1.0}
-          };
-        private Point3d[] EdgeVertex = new Point3d[12];
-
-
         #region classifyVoxel
         //定义一个场函数，输入xyz坐标，返回一个值
         //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
@@ -81,16 +60,25 @@ namespace ALG_MarchingCubes
             gridPos.z = (i >> gridSizeShift.z) & gridSizeMask.z;
             return gridPos;
         }
+        private Alea.int3 calcGridPos2(int i, Alea.int3 gridSize)
+        {
+            Alea.int3 gridPos;
+
+            gridPos.z = i / (gridSize.x * gridSize.y);
+            gridPos.y = i % (gridSize.x * gridSize.y) / gridSize.x;
+            gridPos.x = i % (gridSize.x * gridSize.y) % gridSize.x;
+
+            return gridPos;
+        }
         [GpuManaged]
         private void classifyVoxel(int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
-            Alea.int3 gridSizeShift, Alea.int3 gridSizeMask, int numVoxels,
-            double3 voxelSize, double isoValue)
+            int numVoxels, double3 voxelSize, double isoValue)
         {
-            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
-            int i = blockId * blockDim.x + threadIdx.x;
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
+            int i = blockId * blockDim.x + threadIdx.x; //线程索引
 
             //计算grid中的位置
-            Alea.int3 gridPos = calcGridPos(i, gridSizeShift, gridSizeMask);
+            Alea.int3 gridPos = calcGridPos2(i, gridSize);
 
             Point3d p = new Point3d();
 
@@ -290,9 +278,10 @@ namespace ALG_MarchingCubes
         #region computeIsosurface
         public void computeIsosurface()
         {
-            int threads = 128;
-            Alea.dim3 grid = new Alea.dim3(numVoxels / threads, 1, 1); //block的数量，维度
-            Alea.dim3 block = new Alea.dim3(threads, threads, threads); //thread的数量，维度
+            //多kernel的通用线程管理
+            int threads = 256;
+            Alea.dim3 grid = new Alea.dim3((numVoxels + threads - 1) / threads, 1, 1); //block的数量，维度
+            Alea.dim3 block = new Alea.dim3(threads, 1, 1); //thread的数量，维度
 
             if (grid.x > 65535)
             {
@@ -300,14 +289,14 @@ namespace ALG_MarchingCubes
                 grid.x = 32768;
             }
 
+
             var deviceId = Device.Default.Id;
             var gpu = Gpu.Get(deviceId);
 
             var lp = new LaunchParam(grid, block);
 
             gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
-                gridSize, gridSizeShift, gridSizeMask,
-                     numVoxels, voxelSize, isoValue);
+                gridSize, numVoxels, voxelSize, isoValue);
 
         }
         #endregion
