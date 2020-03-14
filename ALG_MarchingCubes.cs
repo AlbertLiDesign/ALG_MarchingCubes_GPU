@@ -27,6 +27,8 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelVerts", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -88,6 +90,9 @@ namespace ALG_MarchingCubes
            //t_all = 304ms ta = 0.0463 tb = 292.855 ms
 
             sw.Restart();
+
+
+
             if (gpu == false)
             {
                 //开始计算MC
@@ -148,6 +153,11 @@ namespace ALG_MarchingCubes
                 MCgpu.voxelVerts = new int[MCgpu.numVoxels];
 
                 MCgpu.computeIsosurface();
+
+                int[] a = MCgpu.voxelVerts;
+                int[] b = MCgpu.voxelOccupied;
+                DA.SetDataList(2, a);
+                DA.SetDataList(3, b);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
@@ -165,8 +175,6 @@ namespace ALG_MarchingCubes
             mesh.Weld(3.1415926535897931);
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
-
-
 
             DA.SetData(0, mesh);
             DA.SetDataList(1, time);

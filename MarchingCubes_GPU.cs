@@ -69,8 +69,16 @@ namespace ALG_MarchingCubes
 
             return gridPos;
         }
+        public double3 CreateDouble3(double x, double y, double z)
+        {
+            double3 p = new double3();
+            p.x = x;
+            p.y = y;
+            p.z = z;
+            return p;
+        }
         public void classifyVoxel(int[] voxelVerts, int[] voxelOccupied, double[] d_field, Alea.int3 gridSize,
-            int numVoxels, double3 voxelSize, double isoValue, int[] VertsTable, Func<double3, double> fieldFunc)
+            int numVoxels, double3 voxelSize, double isoValue, int[] VertsTable)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
@@ -87,47 +95,13 @@ namespace ALG_MarchingCubes
             //计算cube中的8个点对应的value
             
             d_field[0] = fieldFunc(p);
-            double3 p1 = new double3();
-            p1.x = voxelSize.x + p.x;
-            p1.y = 0 + p.y;
-            p1.z = 0 + p.z;
-            d_field[1] = fieldFunc(p1);
-
-            double3 p2 = new double3();
-            p2.x = voxelSize.x + p.x;
-            p2.y = voxelSize.y + p.y;
-            p2.z = 0 + p.z;
-            d_field[2] = fieldFunc(p2);
-
-            double3 p3 = new double3();
-            p3.x = 0 + p.x;
-            p3.y = voxelSize.y + p.y;
-            p3.z = 0 + p.z;
-            d_field[3] = fieldFunc(p3);
-
-            double3 p4 = new double3();
-            p4.x = 0 + p.x;
-            p4.y = 0 + p.y;
-            p4.z = voxelSize.z + p.z;
-            d_field[4] = fieldFunc(p4);
-
-            double3 p5 = new double3();
-            p5.x = voxelSize.x + p.x;
-            p5.y = 0 + p.y;
-            p5.z = voxelSize.z + p.z;
-            d_field[5] = fieldFunc(p5);
-
-            double3 p6 = new double3();
-            p6.x = voxelSize.x + p.x;
-            p6.y = voxelSize.y + p.y;
-            p6.z = voxelSize.z + p.z;
-            d_field[6] = fieldFunc(p6);
-
-            double3 p7 = new double3();
-            p7.x = 0 + p.x;
-            p7.y = voxelSize.y + p.y;
-            p7.z = voxelSize.z + p.z;
-            d_field[7] = fieldFunc(p7);
+            d_field[1] = fieldFunc(CreateDouble3(voxelSize.x + p.x, 0 + p.y, 0 + p.z));
+            d_field[2] = fieldFunc(CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z));
+            d_field[3] = fieldFunc(CreateDouble3(0 + p.x, voxelSize.y + p.y, 0 + p.z));
+            d_field[4] = fieldFunc(CreateDouble3(0 + p.x, 0 + p.y, voxelSize.z + p.z));
+            d_field[5] = fieldFunc(CreateDouble3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z));
+            d_field[6] = fieldFunc(CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
+            d_field[7] = fieldFunc(CreateDouble3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
 
             //判定它们的状态
             int cubeindex = 0;
@@ -139,8 +113,6 @@ namespace ALG_MarchingCubes
             cubeindex += Convert.ToInt32(d_field[5] < isoValue) * 32;
             cubeindex += Convert.ToInt32(d_field[6] < isoValue) * 64;
             cubeindex += Convert.ToInt32(d_field[7] < isoValue) * 128;
-
-            
 
             //根据点表查找状态
             int numVerts = VertsTable[cubeindex];
@@ -331,11 +303,9 @@ namespace ALG_MarchingCubes
             int[] d_voxelVerts = Gpu.Default.Allocate<int>(voxelVerts);
             int[] d_voxelOccupied = Gpu.Default.Allocate<int>(voxelOccupied);
             
-            Func<double3, double> func = fieldFunc;
-
             double[] d_field = Gpu.Default.Allocate<double>(8);
             gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied, d_field,
-                gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable, func);
+                gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable);
 
             var result_voxelVerts = Gpu.CopyToHost(d_voxelVerts);
             var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
@@ -343,6 +313,9 @@ namespace ALG_MarchingCubes
             Gpu.Free(d_voxelVerts);
             Gpu.Free(d_voxelOccupied);
             Gpu.Free(d_field);
+
+            voxelVerts = result_voxelVerts;
+            voxelOccupied = result_voxelOccupied;
         }
         #endregion
 
