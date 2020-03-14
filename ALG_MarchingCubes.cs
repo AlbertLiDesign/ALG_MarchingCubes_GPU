@@ -144,8 +144,8 @@ namespace ALG_MarchingCubes
 
                 MCgpu.isoValue = isovalue;
 
-                MCgpu.d_voxelOccupied = new int[MCgpu.numVoxels];
-                MCgpu.d_voxelVerts = new int[MCgpu.numVoxels];
+                MCgpu.voxelOccupied = new int[MCgpu.numVoxels];
+                MCgpu.voxelVerts = new int[MCgpu.numVoxels];
 
                 MCgpu.computeIsosurface();
             }

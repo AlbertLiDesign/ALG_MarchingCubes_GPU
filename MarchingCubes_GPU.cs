@@ -27,13 +27,13 @@ namespace ALG_MarchingCubes
         public  Alea.int3 gridSize;
         public  Alea.int3 gridSizeMask;
 
-        // device data
-        double4[] d_pos = null, d_normal = null;
-        public  int[] d_voxelVerts = null;
-        public  int[] d_voxelVertsScan = null;
-        public  int[] d_voxelOccupied = null;
-        public  int[] d_voxelOccupiedScan = null;
-        public  int[] d_compVoxelArray;
+        // data
+        double4[] pos = null, d_normal = null;
+        public int[] voxelVerts = null;
+        public int[] voxelVertsScan = null;
+        public int[] voxelOccupied = null;
+        public int[] voxelOccupiedScan = null;
+        public int[] compVoxelArray;
 
         #region classifyVoxel
         //定义一个场函数，输入xyz坐标，返回一个值
@@ -47,20 +47,19 @@ namespace ALG_MarchingCubes
         }
 
         //定义一个场函数，输入一个点的xyz坐标，返回一个值
-        private double fieldFunc(Point3d p)
+        public double fieldFunc(double3 p)
         {
-            return tangle(p.X, p.Y, p.Z);
+            double x = p.x;
+            double y = p.y;
+            double z = p.z;
+
+            x *= 3.0;
+            y *= 3.0;
+            z *= 3.0;
+            return (x * x * x * x - 5.0 * x * x + y * y * y * y - 5.0 * y * y + z * z * z * z - 5.0 * z * z + 11.8) * 0.2 + 0.5;
         }
         //根据一维索引计算在三维grid中的位置
-        private Alea.int3 calcGridPos(int i, Alea.int3 gridSizeShift, Alea.int3 gridSizeMask)
-        {
-            Alea.int3 gridPos;
-            gridPos.x = i & gridSizeMask.x;
-            gridPos.y = (i >> gridSizeShift.y) & gridSizeMask.y;
-            gridPos.z = (i >> gridSizeShift.z) & gridSizeMask.z;
-            return gridPos;
-        }
-        private Alea.int3 calcGridPos2(int i, Alea.int3 gridSize)
+        private Alea.int3 calcGridPos(int i, Alea.int3 gridSize)
         {
             Alea.int3 gridPos;
 
@@ -70,46 +69,81 @@ namespace ALG_MarchingCubes
 
             return gridPos;
         }
-        [GpuManaged]
-        private void classifyVoxel(int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
-            int numVoxels, double3 voxelSize, double isoValue)
+        public void classifyVoxel(int[] voxelVerts, int[] voxelOccupied, double[] d_field, Alea.int3 gridSize,
+            int numVoxels, double3 voxelSize, double isoValue, int[] VertsTable, Func<double3, double> fieldFunc)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
 
             //计算grid中的位置
-            Alea.int3 gridPos = calcGridPos2(i, gridSize);
+            Alea.int3 gridPos = calcGridPos(i, gridSize);
 
-            Point3d p = new Point3d();
+            double3 p = new double3();
 
-            p.X = -1.0f + (gridPos.x * voxelSize.x);
-            p.Y = -1.0f + (gridPos.y * voxelSize.y);
-            p.Z = -1.0f + (gridPos.z * voxelSize.z);
+            p.x = -1.0f + (gridPos.x * voxelSize.x);
+            p.y = -1.0f + (gridPos.y * voxelSize.y);
+            p.z = -1.0f + (gridPos.z * voxelSize.z);
 
             //计算cube中的8个点对应的value
-            double[] field = new double[8];
-            field[0] = fieldFunc(p);
-            field[1] = fieldFunc(p + new Point3d(voxelSize.x, 0, 0));
-            field[2] = fieldFunc(p + new Point3d(voxelSize.x, voxelSize.y, 0));
-            field[3] = fieldFunc(p + new Point3d(0, voxelSize.y, 0));
-            field[4] = fieldFunc(p + new Point3d(0, 0, voxelSize.z));
-            field[5] = fieldFunc(p + new Point3d(voxelSize.x, 0, voxelSize.z));
-            field[6] = fieldFunc(p + new Point3d(voxelSize.x, voxelSize.y, voxelSize.z));
-            field[7] = fieldFunc(p + new Point3d(0, voxelSize.y, voxelSize.z));
+            
+            d_field[0] = fieldFunc(p);
+            double3 p1 = new double3();
+            p1.x = voxelSize.x + p.x;
+            p1.y = 0 + p.y;
+            p1.z = 0 + p.z;
+            d_field[1] = fieldFunc(p1);
+
+            double3 p2 = new double3();
+            p2.x = voxelSize.x + p.x;
+            p2.y = voxelSize.y + p.y;
+            p2.z = 0 + p.z;
+            d_field[2] = fieldFunc(p2);
+
+            double3 p3 = new double3();
+            p3.x = 0 + p.x;
+            p3.y = voxelSize.y + p.y;
+            p3.z = 0 + p.z;
+            d_field[3] = fieldFunc(p3);
+
+            double3 p4 = new double3();
+            p4.x = 0 + p.x;
+            p4.y = 0 + p.y;
+            p4.z = voxelSize.z + p.z;
+            d_field[4] = fieldFunc(p4);
+
+            double3 p5 = new double3();
+            p5.x = voxelSize.x + p.x;
+            p5.y = 0 + p.y;
+            p5.z = voxelSize.z + p.z;
+            d_field[5] = fieldFunc(p5);
+
+            double3 p6 = new double3();
+            p6.x = voxelSize.x + p.x;
+            p6.y = voxelSize.y + p.y;
+            p6.z = voxelSize.z + p.z;
+            d_field[6] = fieldFunc(p6);
+
+            double3 p7 = new double3();
+            p7.x = 0 + p.x;
+            p7.y = voxelSize.y + p.y;
+            p7.z = voxelSize.z + p.z;
+            d_field[7] = fieldFunc(p7);
 
             //判定它们的状态
-            int cubeindex;
-            cubeindex =   Convert.ToInt32(field[0] < isoValue);
-            cubeindex += Convert.ToInt32(field[1] < isoValue) * 2;
-            cubeindex += Convert.ToInt32(field[2] < isoValue) * 4;
-            cubeindex += Convert.ToInt32(field[3] < isoValue) * 8;
-            cubeindex += Convert.ToInt32(field[4] < isoValue) * 16;
-            cubeindex += Convert.ToInt32(field[5] < isoValue) * 32;
-            cubeindex += Convert.ToInt32(field[6] < isoValue) * 64;
-            cubeindex += Convert.ToInt32(field[7] < isoValue) * 128;
+            int cubeindex = 0;
+            cubeindex = Convert.ToInt32(d_field[0] < isoValue);
+            cubeindex += Convert.ToInt32(d_field[1] < isoValue) * 2;
+            cubeindex += Convert.ToInt32(d_field[2] < isoValue) * 4;
+            cubeindex += Convert.ToInt32(d_field[3] < isoValue) * 8;
+            cubeindex += Convert.ToInt32(d_field[4] < isoValue) * 16;
+            cubeindex += Convert.ToInt32(d_field[5] < isoValue) * 32;
+            cubeindex += Convert.ToInt32(d_field[6] < isoValue) * 64;
+            cubeindex += Convert.ToInt32(d_field[7] < isoValue) * 128;
+
+            
 
             //根据点表查找状态
-            int numVerts = Tables.VertsTable[cubeindex];
+            int numVerts = VertsTable[cubeindex];
 
             if (i < numVoxels)
             {
@@ -188,7 +222,7 @@ namespace ALG_MarchingCubes
             int voxel = i;
 
             //计算三维grid中的位置
-            Alea.int3 gridPos = calcGridPos(voxel, gridSizeShift, gridSizeMask);
+            Alea.int3 gridPos = calcGridPos(voxel,gridSize);
 
             Point3d p = new Point3d();
             p.X = -1.0f + (gridPos.x * voxelSize.x);
@@ -289,15 +323,26 @@ namespace ALG_MarchingCubes
                 grid.x = 32768;
             }
 
-
             var deviceId = Device.Default.Id;
             var gpu = Gpu.Get(deviceId);
 
             var lp = new LaunchParam(grid, block);
 
-            gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue);
+            int[] d_voxelVerts = Gpu.Default.Allocate<int>(voxelVerts);
+            int[] d_voxelOccupied = Gpu.Default.Allocate<int>(voxelOccupied);
+            
+            Func<double3, double> func = fieldFunc;
 
+            double[] d_field = Gpu.Default.Allocate<double>(8);
+            gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied, d_field,
+                gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable, func);
+
+            var result_voxelVerts = Gpu.CopyToHost(d_voxelVerts);
+            var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
+
+            Gpu.Free(d_voxelVerts);
+            Gpu.Free(d_voxelOccupied);
+            Gpu.Free(d_field);
         }
         #endregion
 
