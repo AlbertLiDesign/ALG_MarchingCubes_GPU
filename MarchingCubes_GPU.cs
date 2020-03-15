@@ -139,13 +139,13 @@ namespace ALG_MarchingCubes
         }
         #endregion
         #region generateTriangles
-        private double4 fieldFunc4(Point3d p)
+        private double4 fieldFunc4(double3 p)
         {
-            double v = tangle(p.X, p.Y, p.Z);
+            double v = tangle(p.x, p.y, p.z);
             const double d = 0.001f;
-            double dx = tangle(p.X + d, p.Y, p.Z) - v;
-            double dy = tangle(p.X, p.Y + d, p.Z) - v;
-            double dz = tangle(p.X, p.Y, p.Z + d) - v;
+            double dx = tangle(p.x + d, p.y, p.z) - v;
+            double dy = tangle(p.x, p.y + d, p.z) - v;
+            double dz = tangle(p.x, p.y, p.z + d) - v;
             double4 a = new double4();
             a.x = dx;
             a.y = dy;
@@ -154,9 +154,9 @@ namespace ALG_MarchingCubes
             return a;
         }
         //点的线性插值函数
-        private Point3d lerp(Point3d a, Point3d b, double t)
+        private double3 lerp(double3 a, double3 b, double t)
         {
-            return a + t * (b - a);
+            return CreateDouble3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
         }
         //浮点数的线性插值函数
         private double lerp(double a, double b, double t)
@@ -164,21 +164,20 @@ namespace ALG_MarchingCubes
             return a + t * (b - a);
         }
         //MC顶点的线性插值
-        private Point3d vertexInterp(double isolevel, Point3d p0, Point3d p1, float f0, float f1)
+        private double3 vertexInterp(double isolevel, double3 p0, double3 p1, float f0, float f1)
         {
             double t = (isolevel - f0) / (f1 - f0);
             return lerp(p0, p1, t);
         }
 
         // 计算边上的线性插值顶点
-        private void vertexInterp2(double isolevel, Point3d p0, Point3d p1, double4 f0, double4 f1, ref Point3d p, ref Point3d n)
+        private void vertexInterp2(double isolevel, double3 p0, double3 p1, double4 f0, double4 f1, ref double3 p, ref double3 n)
         {
             double t = (isolevel - f0.w) / (f1.w - f0.w);
             p = lerp(p0, p1, t);
-            n.X = lerp(f0.x, f1.x, t);
-            n.Y = lerp(f0.y, f1.y, t);
-            n.Z = lerp(f0.z, f1.z, t);
-            //    n = normalize(n);
+            n.x = lerp(f0.x, f1.x, t);
+            n.y = lerp(f0.y, f1.y, t);
+            n.z = lerp(f0.z, f1.z, t);
         }
         private void generateTriangles(double4[] pos, double4[] norm,
             int[] compactedVoxelArray, int[] numVertsScanned, Alea.int3 gridSize,
@@ -198,21 +197,21 @@ namespace ALG_MarchingCubes
             //计算三维grid中的位置
             Alea.int3 gridPos = calcGridPos(voxel,gridSize);
 
-            Point3d p = new Point3d();
-            p.X = -1.0f + (gridPos.x * voxelSize.x);
-            p.Y = -1.0f + (gridPos.y * voxelSize.y);
-            p.Z = -1.0f + (gridPos.z * voxelSize.z);
+            double3 p = new double3();
+            p.x = -1.0f + (gridPos.x * voxelSize.x);
+            p.y = -1.0f + (gridPos.y * voxelSize.y);
+            p.z = -1.0f + (gridPos.z * voxelSize.z);
 
             //计算每个cube的位置
-            Point3d[] v = new Point3d[8];
+            double3[] v = new double3[8];
             v[0] = p;
-            v[1] = p + new Point3d(voxelSize.x, 0, 0);
-            v[2] = p + new Point3d(voxelSize.x, voxelSize.y, 0);
-            v[3] = p + new Point3d(0, voxelSize.y, 0);
-            v[4] = p + new Point3d(0, 0, voxelSize.z);
-            v[5] = p + new Point3d(voxelSize.x, 0, voxelSize.z);
-            v[6] = p + new Point3d(voxelSize.x, voxelSize.y, voxelSize.z);
-            v[7] = p + new Point3d(0, voxelSize.y, voxelSize.z);
+            v[1] = CreateDouble3(p.x + voxelSize.x, p.y, p.z);
+            v[2] = CreateDouble3(p.x + voxelSize.x, p.y + voxelSize.y, p.z);
+            v[3] = CreateDouble3(p.x, p.y + voxelSize.y, p.z);
+            v[4] = CreateDouble3(p.x, p.y, p.z + voxelSize.z);
+            v[5] = CreateDouble3(p.x + voxelSize.x, p.y, p.z + voxelSize.z);
+            v[6] = CreateDouble3(p.x + voxelSize.x, p.y + voxelSize.y, p.z + voxelSize.z);
+            v[7] = CreateDouble3(p.x, p.y + voxelSize.y, p.z + voxelSize.z);
 
             // evaluate field values
             double4[] field = new double4[8];
@@ -238,8 +237,8 @@ namespace ALG_MarchingCubes
             cubeindex += Convert.ToInt32(field[7].w < isoValue) * 128;
 
             // find the vertices where the surface intersects the cube
-            Point3d[] vertlist = new Point3d[12];
-            Point3d[] normlist = new Point3d[12];
+            double3[] vertlist = new double3[12];
+            double3[] normlist = new double3[12];
 
             vertexInterp2(isoValue, v[0], v[1], field[0], field[1], ref vertlist[0], ref normlist[0]);
             vertexInterp2(isoValue, v[1], v[2], field[1], field[2], ref vertlist[1], ref normlist[1]);
@@ -267,16 +266,16 @@ namespace ALG_MarchingCubes
                 if (index < maxVerts)
                 {
                     double4 a = new double4();
-                    a.x = vertlist[edge].X;
-                    a.y = vertlist[edge].Y;
-                    a.z = vertlist[edge].Z;
+                    a.x = vertlist[edge].x;
+                    a.y = vertlist[edge].y;
+                    a.z = vertlist[edge].z;
                     a.w = 1.0;
                     pos[index] = a;
 
                     double4 b = new double4();
-                    b.x = normlist[edge].X;
-                    b.y = normlist[edge].Y;
-                    b.z = normlist[edge].Z;
+                    b.x = normlist[edge].x;
+                    b.y = normlist[edge].y;
+                    b.z = normlist[edge].z;
                     b.w = 0.0;
                     norm[index] = b;
                 }
@@ -284,6 +283,7 @@ namespace ALG_MarchingCubes
         }
         #endregion
         #region computeIsosurface
+        public int Sum(int a, int b) { return a + b; }
         public void computeIsosurface()
         {
             //多kernel的通用线程管理
@@ -306,6 +306,7 @@ namespace ALG_MarchingCubes
             int[] d_voxelOccupied = Gpu.Default.Allocate<int>(voxelOccupied);
             int[] d_compactedVoxelArray = Gpu.Default.Allocate<int>(compactedVoxelArray);
             int[] d_voxelOccupiedScan = Gpu.Default.Allocate<int>(voxelOccupiedScan);
+            int[] d_voxelVertsScan = Gpu.Default.Allocate<int>(voxelVertsScan);
 
             double[] d_field = Gpu.Default.Allocate<double>(8);
             gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied, d_field,
@@ -315,13 +316,14 @@ namespace ALG_MarchingCubes
             var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
 
             //Cuda.un
-
-            //Alea.Parallel.GpuExtension.Scan<>(d_voxelVertsScan, d_voxelVerts, numVoxels);
-
+            Func<int,int,int> op = Sum;
+            Alea.Session session = new Alea.Session(gpu);
+            Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_voxelVerts, 0,Sum,numVoxels);
 
             gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied, 
                 d_voxelOccupiedScan, numVoxels);
 
+            Gpu.Free(d_voxelVertsScan);
             Gpu.Free(d_compactedVoxelArray);
             Gpu.Free(d_voxelOccupiedScan);
             Gpu.Free(d_voxelVerts);

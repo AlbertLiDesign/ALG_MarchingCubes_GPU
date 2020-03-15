@@ -151,7 +151,8 @@ namespace ALG_MarchingCubes
                 MCgpu.voxelOccupied = new int[MCgpu.numVoxels];
                 MCgpu.voxelVerts = new int[MCgpu.numVoxels];
                 MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
-
+                MCgpu.voxelVertsScan = new int[MCgpu.numVoxels];
+                
                 MCgpu.computeIsosurface();
 
                 int[] a = MCgpu.voxelVerts;
