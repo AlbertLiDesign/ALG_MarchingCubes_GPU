@@ -30,7 +30,7 @@ namespace ALG_MarchingCubes
         public  Alea.int3 gridSizeMask;
 
         // data
-        double4[] pos = null, d_normal = null;
+        double4[] pos = null, norm = null;
         public int[] voxelVerts = null;
         public int[] voxelVertsScan = null;
         public int[] voxelOccupied = null;
@@ -181,7 +181,6 @@ namespace ALG_MarchingCubes
         }
         private void generateTriangles(double4[] pos, double4[] norm,
             int[] compactedVoxelArray, int[] numVertsScanned, Alea.int3 gridSize,
-            Alea.int3 gridSizeShift, Alea.int3 gridSizeMask,
                   double3 voxelSize, double isoValue, int activeVoxels, int maxVerts)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x;
@@ -312,26 +311,46 @@ namespace ALG_MarchingCubes
             gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied, d_field,
                 gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable);
 
-            var result_voxelVerts = Gpu.CopyToHost(d_voxelVerts);
-            var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
+            voxelVerts = Gpu.CopyToHost(d_voxelVerts);
+            //var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
 
             //Cuda.un
             Func<int,int,int> op = Sum;
             Alea.Session session = new Alea.Session(gpu);
             Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_voxelVerts, 0,Sum,numVoxels);
 
-            gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied, 
-                d_voxelOccupiedScan, numVoxels);
+           voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
+
+            Gpu.Free(d_voxelVerts);
+            Gpu.Free(d_field);
+
+            //gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied, 
+            //    d_voxelOccupiedScan, numVoxels);
+
+            //Gpu.Free(d_voxelOccupied);
+            //Gpu.Free(d_voxelOccupiedScan);
+
+            //compactedVoxelArray = Gpu.CopyToHost(d_compactedVoxelArray);
+            //voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
+
+            //maxVerts = gridSize.x * gridSize.y * 100;
+            //pos = new double4[maxVerts];
+            //norm = new double4[maxVerts];
+            //double4[] d_pos = Gpu.Default.Allocate<double4>(pos);
+            //double4[] d_norm = Gpu.Default.Allocate<double4>(norm);
+
+            //gpu.Launch(generateTriangles, lp,  pos,  norm,
+            // d_compactedVoxelArray, d_voxelVertsScan, gridSize, voxelSize, isoValue, activeVoxels, maxVerts);
 
             Gpu.Free(d_voxelVertsScan);
             Gpu.Free(d_compactedVoxelArray);
-            Gpu.Free(d_voxelOccupiedScan);
-            Gpu.Free(d_voxelVerts);
-            Gpu.Free(d_voxelOccupied);
-            Gpu.Free(d_field);
 
-            voxelVerts = result_voxelVerts;
-            voxelOccupied = result_voxelOccupied;
+            //var result_pos = Gpu.CopyToHost(d_pos);
+            //var result_nom = Gpu.CopyToHost(d_norm);
+
+            //Gpu.Free(d_pos);
+            //Gpu.Free(d_norm);
+
         }
         #endregion
 

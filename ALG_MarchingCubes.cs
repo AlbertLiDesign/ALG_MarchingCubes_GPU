@@ -26,8 +26,8 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelVertsScan", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("voxelVerts", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -152,11 +152,13 @@ namespace ALG_MarchingCubes
                 MCgpu.voxelVerts = new int[MCgpu.numVoxels];
                 MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
                 MCgpu.voxelVertsScan = new int[MCgpu.numVoxels];
-                
+                MCgpu.voxelOccupiedScan = new int[MCgpu.numVoxels];
+
                 MCgpu.computeIsosurface();
 
-                int[] a = MCgpu.voxelVerts;
-                int[] b = MCgpu.voxelOccupied;
+                int[] a = MCgpu.voxelVertsScan;
+                int[] b = MCgpu.voxelVerts;
+
                 DA.SetDataList(2, a);
                 DA.SetDataList(3, b);
             }
