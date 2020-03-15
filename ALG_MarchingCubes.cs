@@ -5,7 +5,6 @@ using Rhino.Geometry;
 using Grasshopper.Kernel.Types;
 using System.Drawing;
 using System.Diagnostics;
-using Alea;
 
 namespace ALG_MarchingCubes
 {
@@ -151,6 +150,7 @@ namespace ALG_MarchingCubes
 
                 MCgpu.voxelOccupied = new int[MCgpu.numVoxels];
                 MCgpu.voxelVerts = new int[MCgpu.numVoxels];
+                MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
 
                 MCgpu.computeIsosurface();
 

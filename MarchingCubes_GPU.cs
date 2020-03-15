@@ -10,6 +10,8 @@ using Rhino.Geometry;
 using Alea.CudaToolkit;
 using Alea;
 using Alea.CSharp;
+using Alea.IL;
+
 namespace ALG_MarchingCubes
 {
     public class MarchingCubes_GPU
@@ -33,7 +35,7 @@ namespace ALG_MarchingCubes
         public int[] voxelVertsScan = null;
         public int[] voxelOccupied = null;
         public int[] voxelOccupiedScan = null;
-        public int[] compVoxelArray;
+        public int[] compactedVoxelArray = null;
 
         #region classifyVoxel
         //定义一个场函数，输入xyz坐标，返回一个值
@@ -302,7 +304,9 @@ namespace ALG_MarchingCubes
 
             int[] d_voxelVerts = Gpu.Default.Allocate<int>(voxelVerts);
             int[] d_voxelOccupied = Gpu.Default.Allocate<int>(voxelOccupied);
-            
+            int[] d_compactedVoxelArray = Gpu.Default.Allocate<int>(compactedVoxelArray);
+            int[] d_voxelOccupiedScan = Gpu.Default.Allocate<int>(voxelOccupiedScan);
+
             double[] d_field = Gpu.Default.Allocate<double>(8);
             gpu.Launch(classifyVoxel, lp, d_voxelVerts, d_voxelOccupied, d_field,
                 gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable);
@@ -310,6 +314,16 @@ namespace ALG_MarchingCubes
             var result_voxelVerts = Gpu.CopyToHost(d_voxelVerts);
             var result_voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
 
+            //Cuda.un
+
+            //Alea.Parallel.GpuExtension.Scan<>(d_voxelVertsScan, d_voxelVerts, numVoxels);
+
+
+            gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied, 
+                d_voxelOccupiedScan, numVoxels);
+
+            Gpu.Free(d_compactedVoxelArray);
+            Gpu.Free(d_voxelOccupiedScan);
             Gpu.Free(d_voxelVerts);
             Gpu.Free(d_voxelOccupied);
             Gpu.Free(d_field);
