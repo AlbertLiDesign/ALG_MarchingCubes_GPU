@@ -26,8 +26,10 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelVertsScan", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("voxelVerts", "", "", GH_ParamAccess.list);
+            pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
+            pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -154,13 +156,14 @@ namespace ALG_MarchingCubes
                 MCgpu.voxelVertsScan = new int[MCgpu.numVoxels];
                 MCgpu.voxelOccupiedScan = new int[MCgpu.numVoxels];
 
-                MCgpu.computeIsosurface();
+                List<Point3d> c = MCgpu.computeIsosurface();
 
-                int[] a = MCgpu.voxelVertsScan;
+                int[] a = MCgpu.voxelOccupied;
                 int[] b = MCgpu.voxelVerts;
 
                 DA.SetDataList(2, a);
                 DA.SetDataList(3, b);
+                DA.SetDataList(4, c);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
@@ -181,6 +184,7 @@ namespace ALG_MarchingCubes
 
             DA.SetData(0, mesh);
             DA.SetDataList(1, time);
+            DA.SetDataList(5, samplePoints);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
