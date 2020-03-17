@@ -10,7 +10,7 @@ using Rhino.Geometry;
 using Alea.CudaToolkit;
 using Alea;
 using Alea.CSharp;
-using Alea.IL;
+using Alea.Parallel;
 
 namespace ALG_MarchingCubes
 {
@@ -19,17 +19,15 @@ namespace ALG_MarchingCubes
         // constants
         public  int numVoxels = 0;
         public  int maxVerts = 0;
-        public  int activeVoxels = 0;
 
         public double3 voxelSize;
         public double isoValue = 0.2;
-        public double dIsoValue = 0.002;
 
-        public  Alea.int3 gridSizeShift;
         public  Alea.int3 gridSize;
-        public  Alea.int3 gridSizeMask;
 
         // data
+        public int[] cudaIndex;
+        public Point3d[] samplePoints = null;
         double4[] pos = null, norm = null;
         public int[] voxelVerts = null;
         public int[] voxelVertsScan = null;
@@ -37,51 +35,30 @@ namespace ALG_MarchingCubes
         public int[] voxelOccupiedScan = null;
         public int[] compactedVoxelArray = null;
 
-        #region classifyVoxel
-        //定义一个场函数，输入xyz坐标，返回一个值
-        //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
-        private double tangle(double x, double y, double z)
+        #region basic functions
+        private double3[] ConvertPointsToDouble3(Point3d[] pts)
         {
-            x *= 3.0;
-            y *= 3.0;
-            z *= 3.0;
-            return (x * x * x * x - 5.0 * x * x + y * y * y * y - 5.0 * y * y + z * z * z * z - 5.0 * z * z + 11.8) * 0.2 + 0.5;
+            double3[] d = new double3[pts.Length];
+            for (int i = 0; i < pts.Length; i++)
+            {
+                d[i].x = pts[i].X;
+                d[i].y = pts[i].Y;
+                d[i].z = pts[i].Z;
+            }
+            return d;
         }
-
-        //定义一个场函数，输入一个点的xyz坐标，返回一个值
-        public double fieldFunc(double3 p)
+        public List<Point3d> ConvertDouble3ToPoint3d(double3[] array)
         {
-            double x = p.x;
-            double y = p.y;
-            double z = p.z;
-
-            x *= 3.0;
-            y *= 3.0;
-            z *= 3.0;
-            return (x * x * x * x - 5.0 * x * x + y * y * y * y - 5.0 * y * y + z * z * z * z - 5.0 * z * z + 11.8) * 0.2 + 0.5;
-        }
-        //根据一维索引计算在三维grid中的位置
-        private Alea.int3 calcGridPos(int i, Alea.int3 gridSize)
-        {
-            Alea.int3 gridPos;
-
-            gridPos.z = i / (gridSize.x * gridSize.y);
-            gridPos.y = i % (gridSize.x * gridSize.y) / gridSize.x;
-            gridPos.x = i % (gridSize.x * gridSize.y) % gridSize.x;
-
-            return gridPos;
-        }
-        public double3 CreateDouble3(double x, double y, double z)
-        {
-            double3 p = new double3();
-            p.x = x;
-            p.y = y;
-            p.z = z;
-            return p;
+            List<Point3d> pts = new List<Point3d>();
+            for (int i = 0; i < array.Length; i++)
+            {
+                pts.Add(new Point3d(array[i].x, array[i].y, array[i].z));
+            }
+            return pts;
         }
         public int Compact(double a, double b)
         {
-            if (a<b)
+            if (a < b)
             {
                 return 1;
             }
@@ -90,94 +67,18 @@ namespace ALG_MarchingCubes
                 return 0;
             }
         }
-        public void classifyVoxel(double3[] voxelV, int[] voxelVerts, int[] voxelOccupied,  Alea.int3 gridSize,
-            int numVoxels, double3 voxelSize, double isoValue, int[] VertsTable)
+        public int Sum(int a, int b) { return a + b; }
+
+        public List<Point3d> ConvertDouble4ToPoint3d(double4[] array)
         {
-            int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
-            int i = blockId * blockDim.x + threadIdx.x; //线程索引
-
-            //计算grid中的位置
-            Alea.int3 gridPos = calcGridPos(i, gridSize);
-
-            double3 p = new double3();
-
-            p.x = gridPos.x * voxelSize.x;
-            p.y = gridPos.y * voxelSize.y;
-            p.z = gridPos.z * voxelSize.z;
-
-            //计算cube中的8个点对应的value
-            
-            double d0 = fieldFunc(p);
-            double d1 = fieldFunc(CreateDouble3(voxelSize.x + p.x, 0 + p.y, 0 + p.z));
-            double d2 = fieldFunc(CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z));
-            double d3 = fieldFunc(CreateDouble3(0 + p.x, voxelSize.y + p.y, 0 + p.z));
-            double d4 = fieldFunc(CreateDouble3(0 + p.x, 0 + p.y, voxelSize.z + p.z));
-            double d5 = fieldFunc(CreateDouble3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z));
-            double d6 = fieldFunc(CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
-            double d7 = fieldFunc(CreateDouble3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
-
-            //输出所有顶点
-            voxelV[i*8] = p;
-            voxelV[i*8+1] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, 0 + p.z);
-            voxelV[i*8+2] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+3] = CreateDouble3(0 + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+4] = CreateDouble3(0 + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+5] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+6] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-            voxelV[i*8+7] = CreateDouble3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-
-            //判定它们的状态
-            int cubeindex = new int();
-            cubeindex = Compact(d0, isoValue);
-            cubeindex += Compact(d1, isoValue) * 2;
-            cubeindex += Compact(d2, isoValue) * 4;
-            cubeindex += Compact(d3, isoValue) * 8;
-            cubeindex += Compact(d4, isoValue) * 16;
-            cubeindex += Compact(d5, isoValue) * 32;
-            cubeindex += Compact(d6, isoValue) * 64;
-            cubeindex += Compact(d7, isoValue) * 128;
-
-            //根据点表查找状态
-            int numVerts = VertsTable[cubeindex];
-
-            if (i < numVoxels)
+            List<Point3d> pts = new List<Point3d>();
+            for (int i = 0; i < array.Length; i++)
             {
-                voxelVerts[i] = numVerts;
-                if (numVerts > 0)
-                {
-                    voxelOccupied[i] = 1;
-                }
-                
+                pts.Add(new Point3d(array[i].x, array[i].y, array[i].z));
             }
+            return pts;
         }
-        #endregion
-        #region compactVoxels
-        private void compactVoxels(int[] compactedVoxelArray, int[] voxelOccupied, int[] voxelOccupiedScan, int numVoxels)
-        {
-            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
-            int i = blockId * blockDim.x + threadIdx.x;
 
-            if ((voxelOccupied[i] == 1) && (i < numVoxels))
-            {
-                compactedVoxelArray[voxelOccupiedScan[i]] = i;
-            }
-        }
-        #endregion
-        #region generateTriangles
-        private double4 fieldFunc4(double3 p)
-        {
-            double v = tangle(p.x, p.y, p.z);
-            const double d = 0.001f;
-            double dx = tangle(p.x + d, p.y, p.z) - v;
-            double dy = tangle(p.x, p.y + d, p.z) - v;
-            double dz = tangle(p.x, p.y, p.z + d) - v;
-            double4 a = new double4();
-            a.x = dx;
-            a.y = dy;
-            a.z = dz;
-            a.w = v;
-            return a;
-        }
         //点的线性插值函数
         private double3 lerp(double3 a, double3 b, double t)
         {
@@ -204,130 +105,222 @@ namespace ALG_MarchingCubes
             n.y = lerp(f0.y, f1.y, t);
             n.z = lerp(f0.z, f1.z, t);
         }
-        private void generateTriangles(double4[] pos, double4[] norm,
-            int[] compactedVoxelArray, int[] numVertsScanned, Alea.int3 gridSize,
-                  double3 voxelSize, double isoValue, int activeVoxels, int maxVerts)
+        //定义一个场函数，输入xyz坐标，返回一个值
+        //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
+        private double tangle(double3[] samplePts, double x, double y, double z)
+        {
+            double result = 0.0;
+            double Dx, Dy, Dz;
+            double sum = samplePts.Length;
+
+            for (int j = 0; j < samplePts.Length; j++)
+            {
+                Dx = x - samplePts[j].x;
+                Dy = y - samplePts[j].y;
+                Dz = z - samplePts[j].z;
+
+                result += (sum * (1 / sum)) / (Dx * Dx + Dy * Dy + Dz * Dz);
+            }
+            return result;
+        }
+
+        //根据一维索引计算在三维grid中的位置
+        private Alea.int3 calcGridPos(int i, Alea.int3 gridSize)
+        {
+            Alea.int3 gridPos;
+
+            gridPos.z = i / (gridSize.x * gridSize.y);
+            gridPos.y = i % (gridSize.x * gridSize.y) / gridSize.x;
+            gridPos.x = i % (gridSize.x * gridSize.y) % gridSize.x;
+
+            return gridPos;
+        }
+        public double3 CreateDouble3(double x, double y, double z)
+        {
+            double3 p = new double3();
+            p.x = x;
+            p.y = y;
+            p.z = z;
+            return p;
+        }
+
+        public double ComputeValue(double3[] samplePts, double3 testP)
+        {
+            double result = 0.0;
+            double Dx, Dy, Dz;
+            double sum = samplePts.Length;
+
+            for (int j = 0; j < samplePts.Length; j++)
+            {
+                Dx = testP.x - samplePts[j].x;
+                Dy = testP.y - samplePts[j].y;
+                Dz = testP.z - samplePts[j].z;
+
+                result += (sum * (1 / sum)) / (Dx * Dx + Dy * Dy + Dz * Dz);
+            }
+            return result;
+        }
+        public double4 fieldFunc4(double3[] samplePts, double3 p)
+        {
+            double4 d4 = new double4();
+            double v = ComputeValue(samplePts, p);
+            const double d = 0.001;
+            d4.x = tangle(samplePts, p.x + d, p.y, p.z) - v;
+            d4.y = tangle(samplePts, p.x, p.y + d, p.z) - v;
+            d4.z = tangle(samplePts, p.x, p.y, p.z + d) - v;
+
+            return d4;
+        }
+        #endregion
+        #region classifyVoxel
+        public void classifyVoxel(double3[] voxelV, int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
+            int numVoxels, double3 voxelSize, double isoValue, double3[] samplePts,int[] VertsTable)
+        {
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
+            int i = blockId * blockDim.x + threadIdx.x; //线程索引
+
+            //计算grid中的位置
+            Alea.int3 gridPos = calcGridPos(i, gridSize);
+
+            double3 p = new double3();
+
+            p.x = gridPos.x * voxelSize.x;
+            p.y = gridPos.y * voxelSize.y;
+            p.z = gridPos.z * voxelSize.z;
+
+            //输出所有顶点
+            voxelV[i*8] = p;
+            voxelV[i*8+1] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, 0 + p.z);
+            voxelV[i*8+2] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z);
+            voxelV[i*8+3] = CreateDouble3(0 + p.x, voxelSize.y + p.y, 0 + p.z);
+            voxelV[i*8+4] = CreateDouble3(0 + p.x, 0 + p.y, voxelSize.z + p.z);
+            voxelV[i*8+5] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z);
+            voxelV[i*8+6] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+            voxelV[i*8+7] = CreateDouble3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+
+            //计算cube中的8个点对应的value
+            double d0 = ComputeValue(samplePts, voxelV[i * 8]);
+            double d1 = ComputeValue(samplePts, voxelV[i * 8 + 1]);
+            double d2 = ComputeValue(samplePts, voxelV[i * 8 + 2]);
+            double d3 = ComputeValue(samplePts, voxelV[i * 8 + 3]);
+            double d4 = ComputeValue(samplePts, voxelV[i * 8 + 4]);
+            double d5 = ComputeValue(samplePts, voxelV[i * 8 + 5]);
+            double d6 = ComputeValue(samplePts, voxelV[i * 8 + 6]);
+            double d7 = ComputeValue(samplePts, voxelV[i * 8 + 7]);
+
+            //判定它们的状态
+            int cubeindex;
+            cubeindex = Compact(d0, isoValue);
+            cubeindex += Compact(d1, isoValue) * 2;
+            cubeindex += Compact(d2, isoValue) * 4;
+            cubeindex += Compact(d3, isoValue) * 8;
+            cubeindex += Compact(d4, isoValue) * 16;
+            cubeindex += Compact(d5, isoValue) * 32;
+            cubeindex += Compact(d6, isoValue) * 64;
+            cubeindex += Compact(d7, isoValue) * 128;
+
+            //根据表来查出该体素的顶点数
+            int numVerts = VertsTable[cubeindex];
+
+            if (i < numVoxels)
+            {
+                voxelVerts[i] = numVerts;
+                if (numVerts > 0)
+                {
+                    voxelOccupied[i] = 1;
+                }
+                
+            }
+        }
+        #endregion
+        #region compactVoxels
+        private void compactVoxels(int[] compactedVoxelArray, int[] voxelOccupied, int[] voxelOccupiedScan, int numVoxels)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x;
             int i = blockId * blockDim.x + threadIdx.x;
 
-            if (i > activeVoxels - 1)
+            if ((voxelOccupied[i] == 1) && (i < numVoxels))
             {
-                i = activeVoxels - 1;
+                compactedVoxelArray[voxelOccupiedScan[i]] = i;
             }
+        }
+        #endregion
+        #region generateTriangles
+        private void generateTriangles(double4[] pos, double4[] norm, double3[] model_voxelActive, double3[] vertlist, double3[] normlist,
+             int[] verts_voxelActive, double3[] samplePts, double isoValue, int[] VertsTable, int[,] TriangleConnectionTable)
+        {
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
+            int i = blockId * blockDim.x + threadIdx.x;
 
-            int voxel = i;
+            //计算其场值
+            double4 d0 = fieldFunc4(samplePts, model_voxelActive[i * 8]);
+            double4 d1 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 1]);
+            double4 d2 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 2]);
+            double4 d3 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 3]);
+            double4 d4 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 4]);
+            double4 d5 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 5]);
+            double4 d6 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 6]);
+            double4 d7 = fieldFunc4(samplePts, model_voxelActive[i * 8 + 7]);
 
-            //计算三维grid中的位置
-            Alea.int3 gridPos = calcGridPos(voxel,gridSize);
+            // 计算判定状态
+            int cubeindex;
+            cubeindex = Compact(d0.w, isoValue);
+            cubeindex += Compact(d1.w, isoValue) * 2;
+            cubeindex += Compact(d2.w, isoValue) * 4;
+            cubeindex += Compact(d3.w, isoValue) * 8;
+            cubeindex += Compact(d4.w, isoValue) * 16;
+            cubeindex += Compact(d5.w, isoValue) * 32;
+            cubeindex += Compact(d6.w, isoValue) * 64;
+            cubeindex += Compact(d7.w, isoValue) * 128;
 
-            double3 p = new double3();
-            p.x = -1.0f + (gridPos.x * voxelSize.x);
-            p.y = -1.0f + (gridPos.y * voxelSize.y);
-            p.z = -1.0f + (gridPos.z * voxelSize.z);
+            //找到位于isosurface的交点，计算顶点在各个边的位置
+            vertexInterp2(isoValue, model_voxelActive[i * 8], model_voxelActive[i * 8+1], d0, d1, ref vertlist[0], ref normlist[0]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 1], model_voxelActive[i * 8 + 2], d1, d2, ref vertlist[1], ref normlist[1]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 2], model_voxelActive[i * 8 + 3], d2, d3, ref vertlist[2], ref normlist[2]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 3], model_voxelActive[i * 8], d3, d0, ref vertlist[3], ref normlist[3]);
 
-            //计算每个cube的位置
-            double3[] v = new double3[8];
-            v[0] = p;
-            v[1] = CreateDouble3(p.x + voxelSize.x, p.y, p.z);
-            v[2] = CreateDouble3(p.x + voxelSize.x, p.y + voxelSize.y, p.z);
-            v[3] = CreateDouble3(p.x, p.y + voxelSize.y, p.z);
-            v[4] = CreateDouble3(p.x, p.y, p.z + voxelSize.z);
-            v[5] = CreateDouble3(p.x + voxelSize.x, p.y, p.z + voxelSize.z);
-            v[6] = CreateDouble3(p.x + voxelSize.x, p.y + voxelSize.y, p.z + voxelSize.z);
-            v[7] = CreateDouble3(p.x, p.y + voxelSize.y, p.z + voxelSize.z);
+            vertexInterp2(isoValue, model_voxelActive[i * 8+4], model_voxelActive[i * 8 + 5], d4, d5, ref vertlist[4], ref normlist[4]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 5], model_voxelActive[i * 8 + 6], d5, d6, ref vertlist[5], ref normlist[5]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 6], model_voxelActive[i * 8 + 7], d6, d7, ref vertlist[6], ref normlist[6]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 7], model_voxelActive[i * 8 + 4], d7, d4, ref vertlist[7], ref normlist[7]);
 
-            // evaluate field values
-            double4[] field = new double4[8];
-            field[0] = fieldFunc4(v[0]);
-            field[1] = fieldFunc4(v[1]);
-            field[2] = fieldFunc4(v[2]);
-            field[3] = fieldFunc4(v[3]);
-            field[4] = fieldFunc4(v[4]);
-            field[5] = fieldFunc4(v[5]);
-            field[6] = fieldFunc4(v[6]);
-            field[7] = fieldFunc4(v[7]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8], model_voxelActive[i * 8 + 4], d0, d4, ref vertlist[8], ref normlist[8]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 1], model_voxelActive[i * 8 + 5], d1, d5, ref vertlist[9], ref normlist[9]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 2], model_voxelActive[i * 8 + 6], d2, d6, ref vertlist[10], ref normlist[10]);
+            vertexInterp2(isoValue, model_voxelActive[i * 8 + 3], model_voxelActive[i * 8 + 7], d3, d7, ref vertlist[11], ref normlist[11]);
 
-            // recalculate flag
-            // (this is faster than storing it in global memory)
-            int cubeindex = 0;
-            cubeindex = Convert.ToInt32(field[0].w < isoValue);
-            cubeindex += Convert.ToInt32(field[1].w < isoValue) * 2;
-            cubeindex += Convert.ToInt32(field[2].w < isoValue) * 4;
-            cubeindex += Convert.ToInt32(field[3].w < isoValue) * 8;
-            cubeindex += Convert.ToInt32(field[4].w < isoValue) * 16;
-            cubeindex += Convert.ToInt32(field[5].w < isoValue) * 32;
-            cubeindex += Convert.ToInt32(field[6].w < isoValue) * 64;
-            cubeindex += Convert.ToInt32(field[7].w < isoValue) * 128;
+            int numVerts = VertsTable[cubeindex];
 
-            // find the vertices where the surface intersects the cube
-            double3[] vertlist = new double3[12];
-            double3[] normlist = new double3[12];
-
-            vertexInterp2(isoValue, v[0], v[1], field[0], field[1], ref vertlist[0], ref normlist[0]);
-            vertexInterp2(isoValue, v[1], v[2], field[1], field[2], ref vertlist[1], ref normlist[1]);
-            vertexInterp2(isoValue, v[2], v[3], field[2], field[3], ref vertlist[2], ref normlist[2]);
-            vertexInterp2(isoValue, v[3], v[0], field[3], field[0], ref vertlist[3], ref normlist[3]);
-
-            vertexInterp2(isoValue, v[4], v[5], field[4], field[5], ref vertlist[4], ref normlist[4]);
-            vertexInterp2(isoValue, v[5], v[6], field[5], field[6], ref vertlist[5], ref normlist[5]);
-            vertexInterp2(isoValue, v[6], v[7], field[6], field[7], ref vertlist[6], ref normlist[6]);
-            vertexInterp2(isoValue, v[7], v[4], field[7], field[4], ref vertlist[7], ref normlist[7]);
-
-            vertexInterp2(isoValue, v[0], v[4], field[0], field[4], ref vertlist[8], ref normlist[8]);
-            vertexInterp2(isoValue, v[1], v[5], field[1], field[5], ref vertlist[9], ref normlist[9]);
-            vertexInterp2(isoValue, v[2], v[6], field[2], field[6], ref vertlist[10], ref normlist[10]);
-            vertexInterp2(isoValue, v[3], v[7], field[3], field[7], ref vertlist[11], ref normlist[11]);
-
-            int numVerts = Tables.VertsTable[cubeindex];
-
+            //每个voxel有numVerts个顶点
             for (int j = 0; j < numVerts; j++)
             {
-                int edge = Tables.TriangleConnectionTable[cubeindex * 16, j];
+                //根据边表找到这些顶点在哪个边上
+                int edge = TriangleConnectionTable[cubeindex * 16, j];
 
-                int index = numVertsScanned[voxel] + j;
+                int index = verts_voxelActive[i] + j;
 
-                if (index < maxVerts)
-                {
-                    double4 a = new double4();
-                    a.x = vertlist[edge].x;
-                    a.y = vertlist[edge].y;
-                    a.z = vertlist[edge].z;
-                    a.w = 1.0;
-                    pos[index] = a;
+                double4 a = new double4();
+                a.x = vertlist[edge].x;
+                a.y = vertlist[edge].y;
+                a.z = vertlist[edge].z;
+                a.w = 1.0;
+                pos[index] = a;
 
-                    double4 b = new double4();
-                    b.x = normlist[edge].x;
-                    b.y = normlist[edge].y;
-                    b.z = normlist[edge].z;
-                    b.w = 0.0;
-                    norm[index] = b;
-                }
+                double4 b = new double4();
+                b.x = normlist[edge].x;
+                b.y = normlist[edge].y;
+                b.z = normlist[edge].z;
+                b.w = 0.0;
+                norm[index] = b;
+
             }
         }
         #endregion
         #region computeIsosurface
-        public int Sum(int a, int b) { return a + b; }
-        public List<Point3d> ConvertDouble3ToPoint3d(double3[] array)
-        {
-            List<Point3d> pts = new List<Point3d>();
-            for (int i = 0; i < array.Length; i++)
-            {
-                pts.Add(new Point3d(array[i].x, array[i].y, array[i].z));
-            }
-            return pts;
-        }
-        public List<Point3d> ConvertDouble4ToPoint3d(double4[] array)
-        {
-            List<Point3d> pts = new List<Point3d>();
-            for (int i = 0; i < array.Length; i++)
-            {
-                pts.Add(new Point3d(array[i].x, array[i].y, array[i].z));
-            }
-            return pts;
-        }
+
         public List<Point3d> computeIsosurface()
         {
+            #region 计算所有voxel的活跃度
             //多kernel的通用线程管理
             int threads = 256;
             Alea.dim3 grid = new Alea.dim3((numVoxels + threads - 1) / threads, 1, 1); //block的数量，维度
@@ -344,174 +337,128 @@ namespace ALG_MarchingCubes
 
             var lp = new LaunchParam(grid, block);
 
+            double3[] samplePts = ConvertPointsToDouble3(samplePoints);
+
             int[] d_voxelVerts = Gpu.Default.Allocate<int>(voxelVerts);
             int[] d_voxelOccupied = Gpu.Default.Allocate<int>(voxelOccupied);
-            int[] d_compactedVoxelArray = Gpu.Default.Allocate<int>(compactedVoxelArray);
-            int[] d_voxelOccupiedScan = Gpu.Default.Allocate<int>(voxelOccupiedScan);
-            int[] d_voxelVertsScan = Gpu.Default.Allocate<int>(voxelVertsScan);
+           
             double3[] d_voxelV = Gpu.Default.Allocate<double3>(numVoxels*8);
+            double3[] d_samplePts = Gpu.Default.Allocate<double3>(samplePts);
 
             gpu.Launch(classifyVoxel, lp, d_voxelV,d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue, Tables.VertsTable);
+                gridSize, numVoxels, voxelSize, isoValue, d_samplePts, Tables.VertsTable);
 
             voxelVerts = Gpu.CopyToHost(d_voxelVerts);
 
+            //所有单元
             double3[] result_voxelV = Gpu.CopyToHost(d_voxelV);
-
+            //活跃voxel的判定集合
             voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
-            voxelVerts = Gpu.CopyToHost(d_voxelVerts);
+            //每个voxel中存在的顶点数
+            voxelVerts = Gpu.CopyToHost(d_voxelVerts); 
 
-            // Func<int, int, int> op = Sum;
+            Gpu.Free(d_voxelVerts);
+            Gpu.Free(d_voxelOccupied);
+            Gpu.Free(d_voxelV);
+            Gpu.Free(d_samplePts);
+            #endregion
+            #region 压缩voxel，提取活跃voxel
+            //计算活跃voxel的个数
+            List<int> index_voxelActiveList = new List<int>();
+            for (int i = 0; i < voxelOccupied.Length; i++)
+            {
+                if (voxelOccupied[i] > 0)
+                {
+                    index_voxelActiveList.Add(i);
+                }
+            }
+
+            //活跃voxel索引
+            int[] index_voxelActive = index_voxelActiveList.ToArray();
+            //活跃voxel数量
+            int num_voxelActive = index_voxelActive.Length;
+
+            //活跃voxel模型
+            double3[] model_voxelActive = new double3[8*num_voxelActive];
+            //活跃voxel中的顶点数
+            int[] verts_voxelActive = new int[num_voxelActive];
+            //总顶点数
+            int sum_Verts = 0;
+
+            for (int i = 0; i < num_voxelActive; i++)
+            {
+                model_voxelActive[8*i] = result_voxelV[8*index_voxelActive[i]];
+                model_voxelActive[8 * i + 1] = result_voxelV[8 * index_voxelActive[i] + 1];
+                model_voxelActive[8 * i + 2] = result_voxelV[8 * index_voxelActive[i] + 2];
+                model_voxelActive[8 * i + 3] = result_voxelV[8 * index_voxelActive[i] + 3];
+                model_voxelActive[8 * i + 4] = result_voxelV[8 * index_voxelActive[i] + 4];
+                model_voxelActive[8 * i + 5] = result_voxelV[8 * index_voxelActive[i] + 5];
+                model_voxelActive[8 * i + 6] = result_voxelV[8 * index_voxelActive[i] + 6];
+                model_voxelActive[8 * i + 7] = result_voxelV[8 * index_voxelActive[i] + 7];
+                verts_voxelActive[i] = voxelVerts[index_voxelActive[i]];
+                sum_Verts+= voxelVerts[index_voxelActive[i]];
+            }
+            #endregion
+            #region 从活跃voxel提取isosurface
+            //多kernel的通用线程管理
+            int threads2 = 256;
+            Alea.dim3 grid2 = new Alea.dim3((num_voxelActive + threads2 - 1) / threads2, 1, 1); //block的数量，维度
+            Alea.dim3 block2 = new Alea.dim3(threads2, 1, 1); //thread的数量，维度
+
+            if (grid2.x > 65535)
+            {
+                grid2.y = grid2.x / 32768;
+                grid2.x = 32768;
+            }
+
+            var lp2 = new LaunchParam(grid2, block2);
+
+            //Func<int, int, int> op = Sum;
             //Alea.Session session = new Alea.Session(gpu);
             //Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_voxelVerts, 0, Sum, numVoxels);
 
             //voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
 
-            Gpu.Free(d_voxelVerts);
-            //Gpu.Free(d_field);
-
             //gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied,
             //    d_voxelOccupiedScan, numVoxels);
-
-            //Gpu.Free(d_voxelOccupied);
-            //Gpu.Free(d_voxelOccupiedScan);
 
             //compactedVoxelArray = Gpu.CopyToHost(d_compactedVoxelArray);
             //voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
 
-            //maxVerts = gridSize.x * gridSize.y * 100;
-            //pos = new double4[maxVerts];
-            //norm = new double4[maxVerts];
+            pos = new double4[sum_Verts];
+            norm = new double4[sum_Verts];
+            double3[] vertlist = new double3[12];
+            double3[] normlist = new double3[12];
 
-            //double4[] d_pos = Gpu.Default.Allocate<double4>(pos);
-            //double4[] d_norm = Gpu.Default.Allocate<double4>(norm);
+            double3[] d_model_voxelActive = Gpu.Default.Allocate<double3>(model_voxelActive);
+            int[] d_verts_voxelActive = Gpu.Default.Allocate<int>(verts_voxelActive);
 
-            //gpu.Launch(generateTriangles, lp, pos, norm,
-            // d_compactedVoxelArray, d_voxelVertsScan, gridSize, voxelSize, isoValue, activeVoxels, maxVerts);
+            double3[] d_samplePts2 = Gpu.Default.Allocate<double3>(samplePts);
 
-            //Gpu.Free(d_voxelV);
-            //Gpu.Free(d_voxelVertsScan);
-            //Gpu.Free(d_compactedVoxelArray);
+            double4[] d_pos = Gpu.Default.Allocate<double4>(pos);
+            double4[] d_norm = Gpu.Default.Allocate<double4>(norm);
+            double3[] d_vertlist = Gpu.Default.Allocate<double3>(vertlist);
+            double3[] d_normlist = Gpu.Default.Allocate<double3>(normlist);
 
+            gpu.Launch(generateTriangles, lp2, d_pos, d_norm, d_model_voxelActive, d_vertlist, d_normlist,  d_verts_voxelActive, 
+                d_samplePts2, isoValue, Tables.VertsTable, Tables.TriangleConnectionTable);
 
-            //var result_pos = Gpu.CopyToHost(d_pos);
-            //var result_nom = Gpu.CopyToHost(d_norm);
+            gpu.Synchronize();
 
-            //Gpu.Free(d_pos);
-            //Gpu.Free(d_norm);
+            var result = Gpu.CopyToHost(d_pos);
 
-            List<Point3d> pts = ConvertDouble3ToPoint3d(result_voxelV);
+            Gpu.Free(d_samplePts);
+            Gpu.Free(d_model_voxelActive);
+            Gpu.Free(d_verts_voxelActive);
+            Gpu.Free(d_pos);
+            Gpu.Free(d_norm);
+
+            #endregion
+
+            List<Point3d> pts = ConvertDouble4ToPoint3d(result);
 
             return pts;
 
-        }
-        #endregion
-
-
-
-        #region matrix
-        private const int BlockSize = 32;
-        //通过指定行列搜索矩阵元素：对于一维数组构造的矩阵，将矩阵行列根据block的行列所计算出的id来找到对应元素
-        private static double GetMatrixElement(int ld, double[] matrix, int blockRow, int blockCol, int row, int col)
-        {
-            var globalRow = blockRow * BlockSize + row;
-            var globalCol = blockCol * BlockSize + col;
-            var globalIdx = globalRow * ld + globalCol;
-            if (globalIdx < matrix.Length)
-                return matrix[globalIdx];
-            else
-                return 0.0;
-        }
-        private static void SetMatrixElement(int ld, double[] matrix, int blockRow, int blockCol, int row, int col,
-    double value)
-        {
-            var globalRow = blockRow * BlockSize + row;
-            var globalCol = blockCol * BlockSize + col;
-            var globalIdx = globalRow * ld + globalCol;
-            if (globalIdx < matrix.Length)
-                matrix[globalIdx] = value;
-        }
-
-        private static int DivUp(int num, int den)
-        {
-            return (num + den - 1) / den;
-        }
-        private static void KernelPacked(double[] a, double[] b, double[] c, int colsA, int colsB, int colsC)
-        {
-            var blockRow = blockIdx.x;
-            var blockCol = blockIdx.y;
-
-            var valueC = 0.0;
-
-            var row = threadIdx.x;
-            var col = threadIdx.y;
-
-            for (var m = 0; m < DivUp(colsA, BlockSize); ++m)
-            {
-                var subA = __shared__.Array2D<double>(BlockSize, BlockSize);
-                var subB = __shared__.Array2D<double>(BlockSize, BlockSize);
-
-                subA[row, col] = GetMatrixElement(colsA, a, blockRow, m, row, col);
-                subB[row, col] = GetMatrixElement(colsB, b, m, blockCol, row, col);
-                DeviceFunction.SyncThreads();
-
-                for (var e = 0; e < BlockSize; ++e)
-                {
-                    valueC += subA[row, e] * subB[e, col];
-                }
-                DeviceFunction.SyncThreads();
-            }
-
-            SetMatrixElement(colsC, c, blockRow, blockCol, row, col, valueC);
-        }
-        private static double[] Pack(double[,] a)
-        {
-            var flat = new double[a.Length];
-            var rows = a.GetLength(0);
-            var cols = a.GetLength(1);
-            for (var i = 0; i < rows; i++)
-                for (var j = 0; j < cols; j++)
-                    flat[i * cols + j] = a[i, j];
-            return flat;
-        }
-
-        [GpuManaged]
-        private static void Unpack(double[] aFlat, double[,] a)
-        {
-            var rows = a.GetLength(0);
-            var cols = a.GetLength(1);
-            for (var i = 0; i < rows; i++)
-                for (var j = 0; j < cols; j++)
-                    a[i, j] = aFlat[i * cols + j];
-        }
-        private static LaunchParam LaunchParam(double[,] a, double[,] b, double[,] c)
-        {
-            //定义二维线程数
-            var blockSize = new Alea.dim3(BlockSize, BlockSize);
-            //定义二维block，这里DivUP是向上取整，相当于ceil操作。例如我们有矩阵A有33列，线程数为32，
-            //那么我们需要多分配一个block用来计算，因此向上取整
-            var gridSize = new Alea.dim3(DivUp(a.GetLength(0), BlockSize), DivUp(b.GetLength(1), BlockSize));
-            return new LaunchParam(gridSize, blockSize);
-        }
-        static readonly Random rng = new Random(42);
-        public static double[,] RandomMatrix(int rows, int cols)
-        {
-            var a = new double[rows, cols];
-            for (var i = 0; i < rows; ++i)
-                for (var j = 0; j < cols; ++j)
-                    a[i, j] = rng.NextDouble();
-            return a;
-        }
-        [GpuManaged]
-        public static void RunGpuPacked(double[,] a, double[,] b, double[,] c)
-        {
-            //声明三个二维数组
-            var lp = LaunchParam(a, b, c);
-            var aFlat = Pack(a);
-            var bFlat = Pack(b);
-            var cFlat = new double[c.Length];
-            Gpu.Default.Launch(KernelPacked, lp, aFlat, bFlat, cFlat, a.GetLength(1), b.GetLength(1), c.GetLength(1));
-            Unpack(cFlat, c);
         }
         #endregion
     }

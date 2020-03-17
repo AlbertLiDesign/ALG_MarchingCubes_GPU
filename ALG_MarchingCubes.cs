@@ -26,8 +26,8 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("voxelVerts", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
         }
@@ -127,18 +127,6 @@ namespace ALG_MarchingCubes
                 gridS.z = zCount;
                 MCgpu.gridSize = gridS;
 
-                Alea.int3 gridSM = new Alea.int3();
-                gridSM.x = MCgpu.gridSize.x - 1;
-                gridSM.y = MCgpu.gridSize.y - 1;
-                gridSM.z = MCgpu.gridSize.z - 1;
-                MCgpu.gridSizeMask = gridSM;
-
-                Alea.int3 gridSS = new Alea.int3();
-                gridSS.x = 0;
-                gridSS.y = xCount;
-                gridSS.z = xCount + yCount;
-                MCgpu.gridSizeShift = gridSS;
-
                 MCgpu.maxVerts = MCgpu.gridSize.x * MCgpu.gridSize.y * 100;
 
                 Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
@@ -155,11 +143,13 @@ namespace ALG_MarchingCubes
                 MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
                 MCgpu.voxelVertsScan = new int[MCgpu.numVoxels];
                 MCgpu.voxelOccupiedScan = new int[MCgpu.numVoxels];
+                MCgpu.samplePoints = samplePoints.ToArray();
 
                 List<Point3d> c = MCgpu.computeIsosurface();
 
-                int[] a = MCgpu.voxelOccupied;
-                int[] b = MCgpu.voxelVerts;
+                int[] a = MCgpu.voxelVerts; 
+                int[] b = MCgpu.voxelVertsScan;
+                
 
                 DA.SetDataList(2, a);
                 DA.SetDataList(3, b);
