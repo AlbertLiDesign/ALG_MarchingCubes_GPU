@@ -168,6 +168,7 @@ namespace ALG_MarchingCubes
             d4.x = tangle(samplePts, p.x + d, p.y, p.z) - v;
             d4.y = tangle(samplePts, p.x, p.y + d, p.z) - v;
             d4.z = tangle(samplePts, p.x, p.y, p.z + d) - v;
+            d4.w = v;
 
             return d4;
         }
@@ -413,17 +414,6 @@ namespace ALG_MarchingCubes
 
             var lp2 = new LaunchParam(grid2, block2);
 
-            //Func<int, int, int> op = Sum;
-            //Alea.Session session = new Alea.Session(gpu);
-            //Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_voxelVerts, 0, Sum, numVoxels);
-
-            //voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
-
-            //gpu.Launch(compactVoxels, lp, d_compactedVoxelArray, d_voxelOccupied,
-            //    d_voxelOccupiedScan, numVoxels);
-
-            //compactedVoxelArray = Gpu.CopyToHost(d_compactedVoxelArray);
-            //voxelVertsScan = Gpu.CopyToHost(d_voxelVertsScan);
 
             pos = new double4[sum_Verts];
             norm = new double4[sum_Verts];
@@ -434,7 +424,6 @@ namespace ALG_MarchingCubes
             int[] d_verts_voxelActive = Gpu.Default.Allocate<int>(verts_voxelActive);
 
             double3[] d_samplePts2 = Gpu.Default.Allocate<double3>(samplePts);
-
             double4[] d_pos = Gpu.Default.Allocate<double4>(pos);
             double4[] d_norm = Gpu.Default.Allocate<double4>(norm);
             double3[] d_vertlist = Gpu.Default.Allocate<double3>(vertlist);
@@ -443,10 +432,11 @@ namespace ALG_MarchingCubes
             gpu.Launch(generateTriangles, lp2, d_pos, d_norm, d_model_voxelActive, d_vertlist, d_normlist,  d_verts_voxelActive, 
                 d_samplePts2, isoValue, Tables.VertsTable, Tables.TriangleConnectionTable);
 
-            gpu.Synchronize();
 
             var result = Gpu.CopyToHost(d_pos);
 
+            Gpu.Free(d_vertlist);
+            Gpu.Free(d_normlist);
             Gpu.Free(d_samplePts);
             Gpu.Free(d_model_voxelActive);
             Gpu.Free(d_verts_voxelActive);
