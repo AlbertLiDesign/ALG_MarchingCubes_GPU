@@ -26,8 +26,9 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelVerts", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
+            pManager.AddNumberParameter("cubeVs", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("verts_voxelActive", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
         }
@@ -97,7 +98,7 @@ namespace ALG_MarchingCubes
             if (gpu == false)
             {
                 //开始计算MC
-                
+                List<int> SumedgeFlags = new List<int>();
                 for (int X = 0; X < xCount; X++)
                 {
                     for (int Y = 0; Y < yCount; Y++)
@@ -105,7 +106,8 @@ namespace ALG_MarchingCubes
                         for (int Z = 0; Z < zCount; Z++)
                         {
                             List<Point3d> pts = new List<Point3d>();
-                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * scale, Y *scale, Z* scale, scale, samplePoints, Weights);
+                            List<int> edgeFlags = new List<int>();
+                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * scale, Y *scale, Z* scale, scale, samplePoints, Weights, ref edgeFlags);
                             if (pts != null)
                             {
                                 foreach (var item in pts)
@@ -113,9 +115,14 @@ namespace ALG_MarchingCubes
                                     meshVs.Add(item);
                                 }
                             }
+                            foreach (var item in edgeFlags)
+                            {
+                                SumedgeFlags.Add(item);
+                            }
                         }
                     }
                 }
+                DA.SetDataList(3, SumedgeFlags);
             }
             else 
             {
@@ -141,19 +148,20 @@ namespace ALG_MarchingCubes
                 MCgpu.voxelOccupied = new int[MCgpu.numVoxels];
                 MCgpu.voxelVerts = new int[MCgpu.numVoxels];
                 MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
-                MCgpu.voxelVertsScan = new int[MCgpu.numVoxels];
                 MCgpu.voxelOccupiedScan = new int[MCgpu.numVoxels];
                 MCgpu.samplePoints = samplePoints.ToArray();
 
                 List<Point3d> c = MCgpu.computeIsosurface();
 
-                int[] a = MCgpu.voxelVerts; 
-                int[] b = MCgpu.voxelVertsScan;
-                
+                double[] a = MCgpu.cubeVs; 
+                int[] b = MCgpu.verts_voxelActive;
+                int[] d = MCgpu.verts_scanIdx;
+
 
                 DA.SetDataList(2, a);
                 DA.SetDataList(3, b);
-                DA.SetDataList(4, c);
+                DA.SetDataList(4, d);
+                DA.SetDataList(5, c);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
@@ -174,7 +182,7 @@ namespace ALG_MarchingCubes
 
             DA.SetData(0, mesh);
             DA.SetDataList(1, time);
-            DA.SetDataList(5, samplePoints);
+            DA.SetDataList(6, samplePoints);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
