@@ -28,6 +28,7 @@ namespace ALG_MarchingCubes
         public  Alea.int3 gridSize;
 
         // data
+        public double[] cubeValues;
         public int[] cudaIndex;
         public Point3d[] samplePoints = null;
         double3[] pos = null;
@@ -38,7 +39,7 @@ namespace ALG_MarchingCubes
         public int[] voxelOccupiedScan = null;
         public int[] compactedVoxelArray = null;
         public double scale = 1.0;
-        public double[] cubeVs;
+        public double[] offsetV;
         public int[] edge_Flags;
 
         private static double[,] Vertices = new double[8, 3]
@@ -268,8 +269,8 @@ namespace ALG_MarchingCubes
         }
         #endregion
         #region generateTriangles
-        private void generateTriangles(int[] d_verts_scanIdx, int[] edgeFlags, double3[] pos, double3[] model_voxelActive, int[,] EdgeConnection, int[,] EdgeDirection, double[,] Vertices,
-            double3[] samplePts, double isoValue, Alea.int3 gridSize,double scale, int[] EdgeTable, int[,] TriangleConnectionTable,double[] cubeValues)
+        private void generateTriangles(double[] d_offset, int[] d_verts_scanIdx, int[] edgeFlags, double3[] pos, double3[] model_voxelActive, int[,] EdgeConnection, int[,] EdgeDirection, double[,] Vertices,
+            double3[] samplePts, double isoValue,double scale, int[] EdgeTable, int[,] TriangleConnectionTable,double[] cubeValues)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x;
             int i = blockId * blockDim.x + threadIdx.x;
@@ -284,13 +285,17 @@ namespace ALG_MarchingCubes
                 cubeValues[i * 8 + j] = ComputeValue(samplePts, model_voxelActive[i * 8 + j]);
                 if (cubeValues[i * 8 + j] <= isoValue)
                 {
+                    flag = 0;
                     flag |= 1 << j;//左移相当于乘，这里相当于乘2的j次方
                     edgeFlags[i * 8 + j] = flag;
                 }
             }
-            
+            DeviceFunction.SyncThreads();
+
+
             //找到哪些几条边和边界相交
             EdgeFlag = EdgeTable[flag];
+            //edgeFlags[i] = EdgeFlag;
 
             for (int j = 0; j < 12; j++)
             {
@@ -303,8 +308,10 @@ namespace ALG_MarchingCubes
                     pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
                     pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
                     pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
+                    num++;
+
+                    d_offset[d_verts_scanIdx[i] + num] = Offset;
                 }
-                num++;
             }
 
         }
@@ -437,18 +444,19 @@ namespace ALG_MarchingCubes
             double[,] d_Vertices = Gpu.Default.Allocate<double>(8, 3);
             double3[] d_samplePts2 = Gpu.Default.Allocate<double3>(samplePts);
             double[] d_cubeValues = Gpu.Default.Allocate<double>(8*num_voxelActive);
-            int[] d_edge_Flags = Gpu.Default.Allocate<int>(8 * num_voxelActive);
+            int[] d_edge_Flags = Gpu.Default.Allocate<int>(8*num_voxelActive);
+            double[] d_offset = Gpu.Default.Allocate<double>(sum_Verts);
 
-            gpu.Launch(generateTriangles, lp2, d_verts_scanIdx, d_edge_Flags, d_pos, d_model_voxelActive, d_EdgeConnection, d_EdgeDirection, d_Vertices,
-                d_samplePts2, isoValue, gridSize, scale, Tables.CubeEdgeFlags, Tables.TriangleConnectionTable, d_cubeValues);
+            gpu.Launch(generateTriangles, lp2, d_offset, d_verts_scanIdx, d_edge_Flags, d_pos, d_model_voxelActive, d_EdgeConnection, d_EdgeDirection, d_Vertices,
+                d_samplePts2, isoValue, 1.0, Tables.CubeEdgeFlags, Tables.TriangleConnectionTable, d_cubeValues);
 
-            gpu.Synchronize();
-
-            var result = Gpu.CopyToHost(d_pos);
-            cubeVs = Gpu.CopyToHost(d_cubeValues);
+            var result = Gpu.CopyToHost(d_model_voxelActive);
             edge_Flags = Gpu.CopyToHost(d_edge_Flags);
+            offsetV = Gpu.CopyToHost(d_offset);
+            cubeValues = Gpu.CopyToHost(d_cubeValues);
 
             Gpu.Free(edge_Flags);
+            Gpu.Free(d_offset);
 
             Gpu.Free(d_pos);
             Gpu.Free(d_model_voxelActive);

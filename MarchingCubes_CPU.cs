@@ -62,7 +62,7 @@ namespace ALG_MarchingCubes
             return (ValueDesired - Value1) / (Value2 - Value1);
         }
 
-        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights,ref List<int> EdgeFlags)
+        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights,ref List<double> ddd)
         {
             //检查权重
             if (Weights.Count < SamplePoints.Count)
@@ -94,8 +94,6 @@ namespace ALG_MarchingCubes
                 {
                     flag |= 1 << i;
                 }
-
-                EdgeFlags.Add(flag);
             }
             //找到哪些几条边和边界相交
             EdgeFlag = Tables.CubeEdgeFlags[flag];
@@ -115,6 +113,7 @@ namespace ALG_MarchingCubes
                     EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
                     EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
                     EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
+                    ddd.Add(Offset);
                 }
             }
 
