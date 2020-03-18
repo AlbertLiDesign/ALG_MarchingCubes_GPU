@@ -414,7 +414,6 @@ namespace ALG_MarchingCubes
 
             var lp2 = new LaunchParam(grid2, block2);
 
-
             pos = new double4[sum_Verts];
             norm = new double4[sum_Verts];
             double3[] vertlist = new double3[12];
@@ -424,6 +423,7 @@ namespace ALG_MarchingCubes
             int[] d_verts_voxelActive = Gpu.Default.Allocate<int>(verts_voxelActive);
 
             double3[] d_samplePts2 = Gpu.Default.Allocate<double3>(samplePts);
+
             double4[] d_pos = Gpu.Default.Allocate<double4>(pos);
             double4[] d_norm = Gpu.Default.Allocate<double4>(norm);
             double3[] d_vertlist = Gpu.Default.Allocate<double3>(vertlist);
@@ -432,11 +432,10 @@ namespace ALG_MarchingCubes
             gpu.Launch(generateTriangles, lp2, d_pos, d_norm, d_model_voxelActive, d_vertlist, d_normlist,  d_verts_voxelActive, 
                 d_samplePts2, isoValue, Tables.VertsTable, Tables.TriangleConnectionTable);
 
+            gpu.Synchronize();
 
             var result = Gpu.CopyToHost(d_pos);
 
-            Gpu.Free(d_vertlist);
-            Gpu.Free(d_normlist);
             Gpu.Free(d_samplePts);
             Gpu.Free(d_model_voxelActive);
             Gpu.Free(d_verts_voxelActive);
