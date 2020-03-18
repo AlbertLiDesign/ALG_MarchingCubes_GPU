@@ -111,7 +111,6 @@ namespace ALG_MarchingCubes
         {
             double result = 0.0;
             double Dx, Dy, Dz;
-            double sum = samplePts.Length;
 
             for (int j = 0; j < samplePts.Length; j++)
             {
@@ -119,7 +118,7 @@ namespace ALG_MarchingCubes
                 Dy = y - samplePts[j].y;
                 Dz = z - samplePts[j].z;
 
-                result += (sum * (1 / sum)) / (Dx * Dx + Dy * Dy + Dz * Dz);
+                result += 1 / (Dx * Dx + Dy * Dy + Dz * Dz);
             }
             return result;
         }
@@ -296,7 +295,7 @@ namespace ALG_MarchingCubes
             for (int j = 0; j < numVerts; j++)
             {
                 //根据边表找到这些顶点在哪个边上
-                int edge = TriangleConnectionTable[cubeindex * 16, j];
+                int edge = TriangleConnectionTable[cubeindex, j];
 
                 int index = verts_voxelActive[i] + j;
 
@@ -436,6 +435,8 @@ namespace ALG_MarchingCubes
 
             var result = Gpu.CopyToHost(d_pos);
 
+            Gpu.Free(d_vertlist);
+            Gpu.Free(d_normlist);
             Gpu.Free(d_samplePts);
             Gpu.Free(d_model_voxelActive);
             Gpu.Free(d_verts_voxelActive);
