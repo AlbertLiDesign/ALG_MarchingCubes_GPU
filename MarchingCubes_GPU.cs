@@ -280,39 +280,159 @@ namespace ALG_MarchingCubes
 
 
             //判定顶点状态，与用户指定的iso值比对
-            for (int j = 0; j < 8; j++)
-            {
-                cubeValues[i * 8 + j] = ComputeValue(samplePts, model_voxelActive[i * 8 + j]);
-                if (cubeValues[i * 8 + j] <= isoValue)
-                {
-                    flag = 0;
-                    flag |= 1 << j;//左移相当于乘，这里相当于乘2的j次方
-                    edgeFlags[i * 8 + j] = flag;
-                }
-            }
-            DeviceFunction.SyncThreads();
 
+            cubeValues[i * 8] = ComputeValue(samplePts, model_voxelActive[i * 8]);
+            cubeValues[i * 8 + 1] = ComputeValue(samplePts, model_voxelActive[i * 8 + 1]);
+            cubeValues[i * 8 + 2] = ComputeValue(samplePts, model_voxelActive[i * 8 + 2]); 
+            cubeValues[i * 8 + 3] = ComputeValue(samplePts, model_voxelActive[i * 8 + 3]);
+            cubeValues[i * 8 + 4] = ComputeValue(samplePts, model_voxelActive[i * 8 + 4]);
+            cubeValues[i * 8 + 5] = ComputeValue(samplePts, model_voxelActive[i * 8 + 5]);
+            cubeValues[i * 8 + 6] = ComputeValue(samplePts, model_voxelActive[i * 8 + 6]);
+            cubeValues[i * 8 + 7] = ComputeValue(samplePts, model_voxelActive[i * 8 + 7]);
+
+            flag = Compact(cubeValues[i * 8] , isoValue);
+            flag += Compact(cubeValues[i * 8 + 1], isoValue) * 2;
+            flag += Compact(cubeValues[i * 8 + 2], isoValue) * 4;
+            flag += Compact(cubeValues[i * 8 + 3], isoValue) * 8;
+            flag += Compact(cubeValues[i * 8 + 4], isoValue) * 16;
+            flag += Compact(cubeValues[i * 8 + 5], isoValue) * 32;
+            flag += Compact(cubeValues[i * 8 + 6], isoValue) * 64;
+            flag += Compact(cubeValues[i * 8 + 7], isoValue) * 128;
+
+            edgeFlags[i] = flag;
 
             //找到哪些几条边和边界相交
             EdgeFlag = EdgeTable[flag];
             //edgeFlags[i] = EdgeFlag;
 
-            for (int j = 0; j < 12; j++)
+            //获取插值系数
+            double t0 = GetOffset(cubeValues[8 * i + 0], cubeValues[8 * i + 1], isoValue);
+            double t1 = GetOffset(cubeValues[8 * i + 1], cubeValues[8 * i + 2], isoValue);
+            double t2 = GetOffset(cubeValues[8 * i + 2], cubeValues[8 * i + 3], isoValue);
+            double t3 = GetOffset(cubeValues[8 * i + 3], cubeValues[8 * i + 0], isoValue);
+            double t4 = GetOffset(cubeValues[8 * i + 4], cubeValues[8 * i + 5], isoValue);
+            double t5 = GetOffset(cubeValues[8 * i + 5], cubeValues[8 * i + 6], isoValue);
+            double t6 = GetOffset(cubeValues[8 * i + 6], cubeValues[8 * i + 7], isoValue);
+            double t7 = GetOffset(cubeValues[8 * i + 7], cubeValues[8 * i + 4], isoValue);
+            double t8 = GetOffset(cubeValues[8 * i + 0], cubeValues[8 * i + 4], isoValue);
+            double t9 = GetOffset(cubeValues[8 * i + 1], cubeValues[8 * i + 5], isoValue);
+            double t10 = GetOffset(cubeValues[8 * i + 2], cubeValues[8 * i + 6], isoValue);
+            double t11 = GetOffset(cubeValues[8 * i + 3], cubeValues[8 * i + 7], isoValue);
+
+            d_offset[12 * i] = t0;
+            d_offset[12 * i+1] = t1;
+            d_offset[12 * i+2] = t2;
+            d_offset[12 * i+3] = t3;
+            d_offset[12 * i+4] = t4;
+            d_offset[12 * i+5] = t5;
+            d_offset[12 * i+6] = t6;
+            d_offset[12 * i+7] = t7;
+            d_offset[12 * i+8] = t8;
+            d_offset[12 * i+9] = t9;
+            d_offset[12 * i+10] = t10;
+            d_offset[12 * i + 11] = t11;
+
+            int num = 0;
+            if ((EdgeFlag & 1) != 0)
             {
-                int num = 0;
-                if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
-                {
-                    Offset = GetOffset(cubeValues[8 * i + EdgeConnection[j, 0]], cubeValues[8 * i + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
-
-                    //获取边上顶点的坐标
-                    pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
-                    pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
-                    pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
-                    num++;
-
-                    d_offset[d_verts_scanIdx[i] + num] = Offset;
-                }
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 0.0) * scale;
+                num++;
             }
+            if ((EdgeFlag & 2) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0+ Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 4) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * -1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 8) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * -1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 16) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (1.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 64) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (1.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 128) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * -1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (1.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 256) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * -1.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (1.0 + Offset * 0.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 512) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 1.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 1024) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 1.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 2048) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 1.0) * scale;
+                num++;
+            }
+            if ((EdgeFlag & 4096) != 0)
+            {
+                pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (0.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (1.0 + Offset * 0.0) * scale;
+                pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (0.0 + Offset * 1.0) * scale;
+                num++;
+            }
+            //for (int j = 0; j < 12; j++)
+            //{
+            //    int num = 0;
+            //    if (EdgeFlag != 0) //如果在这条边上有交点
+            //    {
+
+
+            //        //获取边上顶点的坐标
+            //pos[d_verts_scanIdx[i] + num].x = model_voxelActive[i].x * scale + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
+            //pos[d_verts_scanIdx[i] + num].y = model_voxelActive[i].y * scale + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
+            //pos[d_verts_scanIdx[i] + num].z = model_voxelActive[i].z * scale + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
+            //        num++;
+
+            //        d_offset[d_verts_scanIdx[i] + num] = Offset;
+            //    }
+            //}
 
         }
         #endregion
@@ -320,6 +440,7 @@ namespace ALG_MarchingCubes
 
         public List<Point3d> computeIsosurface()
         {
+           
             #region 计算所有voxel的活跃度
             //多kernel的通用线程管理
             int threads = 256;
@@ -414,7 +535,7 @@ namespace ALG_MarchingCubes
 
             verts_scanIdx = new int[num_voxelActive];
 
-            for (int i = 1; i < num_voxelActive-1; i++)
+            for (int i = 1; i < num_voxelActive; i++)
             {
                 verts_scanIdx[i] = result_Scan[i - 1];
             }
@@ -444,8 +565,8 @@ namespace ALG_MarchingCubes
             double[,] d_Vertices = Gpu.Default.Allocate<double>(8, 3);
             double3[] d_samplePts2 = Gpu.Default.Allocate<double3>(samplePts);
             double[] d_cubeValues = Gpu.Default.Allocate<double>(8*num_voxelActive);
-            int[] d_edge_Flags = Gpu.Default.Allocate<int>(8*num_voxelActive);
-            double[] d_offset = Gpu.Default.Allocate<double>(sum_Verts);
+            int[] d_edge_Flags = Gpu.Default.Allocate<int>(num_voxelActive);
+            double[] d_offset = Gpu.Default.Allocate<double>(12 * num_voxelActive);
 
             gpu.Launch(generateTriangles, lp2, d_offset, d_verts_scanIdx, d_edge_Flags, d_pos, d_model_voxelActive, d_EdgeConnection, d_EdgeDirection, d_Vertices,
                 d_samplePts2, isoValue, 1.0, Tables.CubeEdgeFlags, Tables.TriangleConnectionTable, d_cubeValues);

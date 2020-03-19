@@ -27,10 +27,11 @@ namespace ALG_MarchingCubes
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
             pManager.AddNumberParameter("offsetV", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("verts_voxelActive", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("edge_Flags", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
+            pManager.AddNumberParameter("CubeV", "", "", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -154,12 +155,14 @@ namespace ALG_MarchingCubes
                 double[] a = MCgpu.offsetV; 
                 int[] b = MCgpu.edge_Flags;
                 int[] d = MCgpu.verts_scanIdx;
+                double[] g = MCgpu.cubeValues;
 
 
                 DA.SetDataList(2, a);
                 DA.SetDataList(3, b);
                 DA.SetDataList(4, d);
                 DA.SetDataList(5, c);
+                DA.SetDataList(7, g);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;

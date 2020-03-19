@@ -10,7 +10,7 @@ using Rhino.Geometry;
 
 namespace ALG_MarchingCubes
 {
-        public class MarchingCubes_CPU
+    public class MarchingCubes_CPU
     {
         private static double[,] Vertices = new double[8, 3]
           {
@@ -62,7 +62,7 @@ namespace ALG_MarchingCubes
             return (ValueDesired - Value1) / (Value2 - Value1);
         }
 
-        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights,ref List<double> ddd)
+        public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights, ref List<double> cubeValue)
         {
             //检查权重
             if (Weights.Count < SamplePoints.Count)
@@ -88,7 +88,7 @@ namespace ALG_MarchingCubes
                 CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
                   fy + Vertices[i, 1] * Scale,
                   fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
-
+                cubeValue.Add(CubeValues[i]);
                 //判定顶点状态，与用户指定的iso值比对
                 if (CubeValues[i] <= isovalue)
                 {
@@ -113,7 +113,7 @@ namespace ALG_MarchingCubes
                     EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
                     EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
                     EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
-                    ddd.Add(Offset);
+                    
                 }
             }
 
