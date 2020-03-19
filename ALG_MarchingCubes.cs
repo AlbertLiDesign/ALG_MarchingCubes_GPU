@@ -5,6 +5,8 @@ using Rhino.Geometry;
 using Grasshopper.Kernel.Types;
 using System.Drawing;
 using System.Diagnostics;
+using Grasshopper;
+using Grasshopper.Kernel.Data;
 
 namespace ALG_MarchingCubes
 {
@@ -26,12 +28,10 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
-            pManager.AddNumberParameter("offsetV", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("edge_Flags", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
-            pManager.AddNumberParameter("CubeV", "", "", GH_ParamAccess.list);
+            pManager.AddPointParameter("ISO", "", "", GH_ParamAccess.list);
+            pManager.AddNumberParameter("index3d", "", "", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -144,25 +144,26 @@ namespace ALG_MarchingCubes
 
                 MCgpu.isoValue = isovalue;
 
-                MCgpu.voxelOccupied = new int[MCgpu.numVoxels];
-                MCgpu.voxelVerts = new int[MCgpu.numVoxels];
-                MCgpu.compactedVoxelArray = new int[MCgpu.numVoxels];
-                MCgpu.voxelOccupiedScan = new int[MCgpu.numVoxels];
                 MCgpu.samplePoints = samplePoints.ToArray();
 
                 List<Point3d> c = MCgpu.computeIsosurface();
 
-                double[] a = MCgpu.offsetV; 
-                int[] b = MCgpu.edge_Flags;
-                int[] d = MCgpu.verts_scanIdx;
-                double[] g = MCgpu.cubeValues;
+                int[,] index3d = MCgpu.gridIndex3d;
 
+                DataTree<int> a3d = new DataTree<int>();
+                //for (int i = 0; i < index3d.GetLength(0); i++)
+                //{
+                //    GH_Path ghp = new GH_Path(i);
+                //    for (int j = 0; j < index3d.GetLength(1); j++)
+                //    {
+                //        a3d.Add(index3d[i, j], ghp);
+                //    }
+                //}
+                List<Point3d> a = MCgpu.pp;
 
-                DA.SetDataList(2, a);
-                DA.SetDataList(3, b);
-                DA.SetDataList(4, d);
-                DA.SetDataList(5, c);
-                DA.SetDataList(7, g);
+                DA.SetDataList(2, c);
+                DA.SetDataList(4, a);
+                DA.SetDataTree(5, a3d);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
@@ -183,7 +184,7 @@ namespace ALG_MarchingCubes
 
             DA.SetData(0, mesh);
             DA.SetDataList(1, time);
-            DA.SetDataList(6, samplePoints);
+            DA.SetDataList(3, samplePoints);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
