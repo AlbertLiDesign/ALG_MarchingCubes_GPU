@@ -28,6 +28,9 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
+            pManager.AddIntegerParameter("edgeFlags", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("ISO", "", "", GH_ParamAccess.list);
@@ -141,12 +144,11 @@ namespace ALG_MarchingCubes
                 voxelS.z = 1 * scale;
                 MCgpu.voxelSize = voxelS;
                 MCgpu.numVoxels = MCgpu.gridSize.x * MCgpu.gridSize.y * MCgpu.gridSize.z;
-
+                MCgpu.scale = scale;
                 MCgpu.isoValue = isovalue;
-
                 MCgpu.samplePoints = samplePoints.ToArray();
 
-                List<Point3d> c = MCgpu.computeIsosurface();
+                List<Point3d> c = MCgpu.runGPU_MC();
 
                 int[,] index3d = MCgpu.gridIndex3d;
 
@@ -161,9 +163,12 @@ namespace ALG_MarchingCubes
                 //}
                 List<Point3d> a = MCgpu.pp;
 
-                DA.SetDataList(2, c);
-                DA.SetDataList(4, a);
-                DA.SetDataTree(5, a3d);
+                DA.SetDataList("voxelOccupied", MCgpu.voxelOccupied);
+                DA.SetDataList("verts_scanIdx", MCgpu.verts_scanIdx);
+                DA.SetDataList("edgeFlags", MCgpu.edgeFlags);
+                DA.SetDataList("Pts", c);
+                DA.SetDataList("ISO", a);
+                DA.SetDataTree(7, a3d);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
@@ -182,9 +187,9 @@ namespace ALG_MarchingCubes
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
 
-            DA.SetData(0, mesh);
-            DA.SetDataList(1, time);
-            DA.SetDataList(3, samplePoints);
+            DA.SetData("Mesh", mesh);
+            DA.SetDataList("Time", time);
+            DA.SetDataList("Map", samplePoints);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid

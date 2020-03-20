@@ -11,6 +11,7 @@ using Alea.CudaToolkit;
 using Alea;
 using Alea.CSharp;
 using Alea.Parallel;
+using System.Threading;
 
 namespace ALG_MarchingCubes
 {
@@ -28,19 +29,38 @@ namespace ALG_MarchingCubes
         public  Alea.int3 gridSize;
         public int[,] gridIndex3d;
 
-        // data
+        //采样点
+        double3[] samplePts;
+
+        //voxel在grid中的索引
+        public Alea.int3[] gridIdx;
+        //活跃voxel在grid中的索引
+        public Alea.int3[] index3d_voxelActive;
+        //所有voxel顶点坐标
+        public double3[] result_voxelV;
+
+        //活跃voxel的顶点总数
+        public int sumVerts;
+        //活跃voxel数量
+        public int num_voxelActive;
+        //活跃voxel的顶点坐标
+        public double3[] model_voxelActive;
+
+        //所有voxel的状态
+        public int[] cubeindices;
+        //voxel缩放倍率
+        public double scale;
+
         public List<Point3d> pp;
         public double[] cubeValues;
         public int[] cudaIndex;
         public Point3d[] samplePoints = null;
-        double3[] pos = null;
         public int[] voxelVerts = null;
         public int[] verts_voxelActive = null;
         public int[] verts_scanIdx = null;
         public int[] voxelOccupied = null;
         public int[] voxelOccupiedScan = null;
         public int[] compactedVoxelArray = null;
-        public double scale = 1.0;
         public double[] offsetV;
         public int[] edgeFlags;
 
@@ -177,7 +197,6 @@ namespace ALG_MarchingCubes
         {
             double result = 0.0;
             double Dx, Dy, Dz;
-            double sum = samplePts.Length;
 
             for (int j = 0; j < samplePts.Length; j++)
             {
@@ -185,7 +204,7 @@ namespace ALG_MarchingCubes
                 Dy = testP.y - samplePts[j].y;
                 Dz = testP.z - samplePts[j].z;
 
-                result += (sum * (1 / sum)) / (Dx * Dx + Dy * Dy + Dz * Dz);
+                result +=1 / (Dx * Dx + Dy * Dy + Dz * Dz);
             }
             return result;
         }
@@ -197,8 +216,7 @@ namespace ALG_MarchingCubes
             return (ValueDesired - Value1) / (Value2 - Value1);
         }
         #endregion
-        #region classifyVoxel
-        public void classifyVoxel(double3[] voxelV, int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
+        public void classifyVoxel(int[] cubeindices, double3[] voxelV, int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
             int numVoxels, double3 voxelSize, double isoValue, double3[] samplePts,int[] VertsTable, Alea.int3[] gridIdx)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
@@ -206,9 +224,7 @@ namespace ALG_MarchingCubes
 
             //计算grid中的位置
             Alea.int3 gridPos = calcGridPos(i, gridSize);
-
             gridIdx[i] = gridPos;
-
             double3 p = new double3();
 
             p.x = gridPos.x * voxelSize.x;
@@ -246,9 +262,10 @@ namespace ALG_MarchingCubes
             cubeindex += Compact(d6, isoValue) * 64;
             cubeindex += Compact(d7, isoValue) * 128;
 
+            cubeindices[i] = cubeindex;
+
             //根据表来查出该体素的顶点数
             int numVerts = VertsTable[cubeindex];
-
             if (i < numVoxels)
             {
                 voxelVerts[i] = numVerts;
@@ -256,28 +273,12 @@ namespace ALG_MarchingCubes
                 {
                     voxelOccupied[i] = 1;
                 }
-                
             }
         }
-        #endregion
-        #region compactVoxels
-        private void compactVoxels(int[] compactedVoxelArray, int[] voxelOccupied, int[] voxelOccupiedScan, int numVoxels)
-        {
-            int blockId = blockIdx.y * gridDim.x + blockIdx.x;
-            int i = blockId * blockDim.x + threadIdx.x;
-
-            if ((voxelOccupied[i] == 1) && (i < numVoxels))
-            {
-                compactedVoxelArray[voxelOccupiedScan[i]] = i;
-            }
-        }
-        #endregion
-        #region generateTriangles
         private void computeEdgeFlags(double[] cubeValues, int[] edgeFlags, double3[] model_voxelActive, double3[] samplePts, double isoValue,int[] EdgeTable)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x;
             int i = blockId * blockDim.x + threadIdx.x;
-            int flag = 0;
 
             //判定顶点状态，与用户指定的iso值比对
             cubeValues[i * 8] = ComputeValue(samplePts, model_voxelActive[i * 8]);
@@ -289,7 +290,7 @@ namespace ALG_MarchingCubes
             cubeValues[i * 8 + 6] = ComputeValue(samplePts, model_voxelActive[i * 8 + 6]);
             cubeValues[i * 8 + 7] = ComputeValue(samplePts, model_voxelActive[i * 8 + 7]);
 
-            flag = Compact(cubeValues[i * 8] , isoValue);
+            int flag = Compact(cubeValues[i * 8] , isoValue);
             flag += Compact(cubeValues[i * 8 + 1], isoValue) * 2;
             flag += Compact(cubeValues[i * 8 + 2], isoValue) * 4;
             flag += Compact(cubeValues[i * 8 + 3], isoValue) * 8;
@@ -303,27 +304,30 @@ namespace ALG_MarchingCubes
         }
         private void generateTriangles(double3[] pos, int[] edgeFlags, Alea.int3[] d_index3d_voxelActive, int[] d_verts_scanIdx, 
          int[,] EdgeConnection, double[,] EdgeDirection, double[,] Vertices,
-         double isoValue, double scale, int[,] TriangleConnectionTable, double[] cubeValues)
+         double isoValue, double scale, int[,] TriangleConnectionTable, double[] cubeValues, int[] d_k)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x;
             int i = blockId * blockDim.x + threadIdx.x;
 
-            for (int j = 0; j < 12; i++)
-            {
-                //int k = 0;
-                if ((edgeFlags[i] & (1 << i)) != 0) //如果在这条边上有交点
-                {
-                    double Offset = GetOffset(cubeValues[i * 8 + EdgeConnection[j, 0]], cubeValues[i * 8 + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
+            int scanIdx = d_verts_scanIdx[i];
+            int k = 0;
 
-                    //获取边上顶点的坐标
-                    pos[d_verts_scanIdx[i]].x = d_index3d_voxelActive[i].x + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
-                    pos[d_verts_scanIdx[i]].y = d_index3d_voxelActive[i].y + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
-                    pos[d_verts_scanIdx[i]].z = d_index3d_voxelActive[i].z + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
-                    //k++;
-                }
-            }
+            //for (int j = 0; j < 12; i++)
+            //{
+                
+            //    if ((edgeFlags[i] & (1 << i)) != 0) //如果在这条边上有交点
+            //    {
+            //        double Offset = GetOffset(cubeValues[i * 8 + EdgeConnection[j, 0]], cubeValues[i * 8 + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
+
+            //        //获取边上顶点的坐标
+            //        pos[scanIdx+k].x = d_index3d_voxelActive[i].x + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
+            //        pos[scanIdx+k].y = d_index3d_voxelActive[i].y + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
+            //        pos[scanIdx+k].z = d_index3d_voxelActive[i].z + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
+            //        k++;
+            //    }
+            //}
+            //d_k[i] = k;
         }
-        #endregion
 
 
         public int[,] ConvertInt3ToIntArray(Alea.int3[] a)
@@ -338,14 +342,12 @@ namespace ALG_MarchingCubes
             return b;
 
         }
-        #region computeIsosurface
 
-        public List<Point3d> computeIsosurface()
-        {
-           
-            #region 计算所有voxel的活跃度
+        //计算所有voxel的活跃度
+        private void runClassifyVoxel()
+        { 
             //多kernel的通用线程管理
-            int threads = 256;
+            int threads = 128;
             Alea.dim3 grid = new Alea.dim3((numVoxels + threads - 1) / threads, 1, 1); //block的数量，维度
             Alea.dim3 block = new Alea.dim3(threads, 1, 1); //thread的数量，维度
 
@@ -356,36 +358,36 @@ namespace ALG_MarchingCubes
             }
 
             var gpu = Gpu.Default;
-
             var lp = new LaunchParam(grid, block);
 
-            double3[] samplePts = ConvertPointsToDouble3(samplePoints);
+            samplePts = ConvertPointsToDouble3(samplePoints);
 
-            int[] d_voxelVerts = Gpu.Default.Allocate<int>(numVoxels);
-            int[] d_voxelOccupied = Gpu.Default.Allocate<int>(numVoxels);
-           
-            double3[] d_voxelV = Gpu.Default.Allocate<double3>(numVoxels*8);
-            double3[] d_samplePts = Gpu.Default.Allocate<double3>(samplePts);
+            int[] d_voxelVerts = gpu.Allocate<int>(numVoxels);
+            int[] d_voxelOccupied = gpu.Allocate<int>(numVoxels);
+            double3[] d_voxelV = gpu.Allocate<double3>(numVoxels*8);
+            double3[] d_samplePts = gpu.Allocate<double3>(samplePts);
+            Alea.int3[] d_gridIdx = gpu.Allocate<Alea.int3>(numVoxels);
+            int[] d_VertsTable = gpu.Allocate<int>(Tables.VertsTable);
+            int[] d_cubeindices = gpu.Allocate<int>(numVoxels);
 
-            Alea.int3[] gridIdx = new Alea.int3[numVoxels];
-            Alea.int3[] d_gridIdx = Gpu.Default.Allocate<Alea.int3>(gridIdx);
-
-            gpu.Launch(classifyVoxel, lp, d_voxelV,d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue, d_samplePts, Tables.VertsTable, d_gridIdx);
-
-            voxelVerts = Gpu.CopyToHost(d_voxelVerts);
-
+            gpu.Launch(classifyVoxel, lp, d_cubeindices,d_voxelV, d_voxelVerts, d_voxelOccupied,
+                gridSize, numVoxels, voxelSize, isoValue, d_samplePts, d_VertsTable, d_gridIdx);
+            
             //所有单元
-            double3[] result_voxelV = Gpu.CopyToHost(d_voxelV);
+            result_voxelV = Gpu.CopyToHost(d_voxelV);
             //活跃voxel的判定集合
             voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
+
+            cubeindices= Gpu.CopyToHost(d_cubeindices);
             //每个voxel中存在的顶点数
             voxelVerts = Gpu.CopyToHost(d_voxelVerts);
             //每个voxel的三维索引
             gridIdx = Gpu.CopyToHost(d_gridIdx);
-
-            #endregion
-            #region 压缩voxel，提取活跃voxel
+        }
+        //压缩voxel，提取活跃voxel
+        private void runExtractActiveVoxels()
+        {
+            var gpu = Gpu.Default;
             //计算活跃voxel的个数
             List<int> index_voxelActiveList = new List<int>();
             List<Alea.int3> index3d_voxelActiveList = new List<Alea.int3>();
@@ -400,21 +402,20 @@ namespace ALG_MarchingCubes
 
             //活跃voxel索引
             int[] index_voxelActive = index_voxelActiveList.ToArray();
-            //活跃voxel数量
-            int num_voxelActive = index_voxelActive.Length;
+            num_voxelActive = index_voxelActive.Length;
             //活跃Voxel在grid中的索引
-            Alea.int3[] index3d_voxelActive = index3d_voxelActiveList.ToArray();
-
+            index3d_voxelActive = index3d_voxelActiveList.ToArray();
+            gridIndex3d = ConvertInt3ToIntArray(index3d_voxelActive);
             //活跃voxel模型
-            double3[] model_voxelActive = new double3[8*num_voxelActive];
+            model_voxelActive = new double3[8 * num_voxelActive];
             //活跃voxel中的顶点数
             verts_voxelActive = new int[num_voxelActive];
             //总顶点数
-            int sumVerts = 0;
+            sumVerts = 0;
 
             for (int i = 0; i < num_voxelActive; i++)
             {
-                model_voxelActive[8*i] = result_voxelV[8*index_voxelActive[i]];
+                model_voxelActive[8 * i] = result_voxelV[8 * index_voxelActive[i]];
                 model_voxelActive[8 * i + 1] = result_voxelV[8 * index_voxelActive[i] + 1];
                 model_voxelActive[8 * i + 2] = result_voxelV[8 * index_voxelActive[i] + 2];
                 model_voxelActive[8 * i + 3] = result_voxelV[8 * index_voxelActive[i] + 3];
@@ -423,7 +424,7 @@ namespace ALG_MarchingCubes
                 model_voxelActive[8 * i + 6] = result_voxelV[8 * index_voxelActive[i] + 6];
                 model_voxelActive[8 * i + 7] = result_voxelV[8 * index_voxelActive[i] + 7];
                 verts_voxelActive[i] = voxelVerts[index_voxelActive[i]];
-                sumVerts+= voxelVerts[index_voxelActive[i]];
+                sumVerts += voxelVerts[index_voxelActive[i]];
             }
 
             //扫描以获得最终点索引
@@ -436,6 +437,7 @@ namespace ALG_MarchingCubes
 
             var result_Scan = Gpu.CopyToHost(d_voxelVertsScan);
 
+
             verts_scanIdx = new int[num_voxelActive];
 
             for (int i = 1; i < num_voxelActive; i++)
@@ -443,10 +445,13 @@ namespace ALG_MarchingCubes
                 verts_scanIdx[i] = result_Scan[i - 1];
             }
             verts_scanIdx[0] = 0;
-            #endregion
-            
+        }
+
+        private void runComputeEdgeFlags()
+        {
+            var gpu = Gpu.Default;
             //多kernel的通用线程管理
-            int threads2 = 256;
+            int threads2 = 128;
             Alea.dim3 grid2 = new Alea.dim3((num_voxelActive + threads2 - 1) / threads2, 1, 1); //block的数量，维度
             Alea.dim3 block2 = new Alea.dim3(threads2, 1, 1); //thread的数量，维度
 
@@ -458,7 +463,6 @@ namespace ALG_MarchingCubes
 
             var lp2 = new LaunchParam(grid2, block2);
 
-            #region computeEdgeFlags
             //声明输出参数
             double[] d_cubeValues = Gpu.Default.Allocate<double>(8 * num_voxelActive);
             int[] d_edgeFlags = Gpu.Default.Allocate<int>(num_voxelActive);
@@ -466,22 +470,34 @@ namespace ALG_MarchingCubes
             //拷贝输入参数
             double3[] d_model_voxelActive = Gpu.Default.Allocate<double3>(model_voxelActive);
             int[] d_CubeEdgeFlags = Gpu.Default.Allocate<int>(Tables.CubeEdgeFlags);
-            //gpu.Copy(model_voxelActive, d_model_voxelActive.p)
-
+            double3[] d_samplePts = gpu.Allocate<double3>(samplePts);
             //共5个设备端参数
             gpu.Launch(computeEdgeFlags, lp2, d_cubeValues, d_edgeFlags, d_model_voxelActive, d_samplePts, isoValue, d_CubeEdgeFlags);
-
-            var result = Gpu.CopyToHost(d_model_voxelActive);//输出活跃box坐标
-            edgeFlags = Gpu.CopyToHost(d_edgeFlags);//输出每个体素的边状态
+            model_voxelActive = Gpu.CopyToHost(d_model_voxelActive);//输出活跃box坐标
+            edgeFlags = Gpu.CopyToHost(d_edgeFlags);//输出每个活跃体素的边状态
             cubeValues = Gpu.CopyToHost(d_cubeValues);//每个cube的值
+        }
+        //从活跃voxel提取isosurface
+        private void runComputeIsosurface()
+        {
+            var gpu = Gpu.Default;
+            //多kernel的通用线程管理
+            int threads2 = 128;
+            Alea.dim3 grid2 = new Alea.dim3((num_voxelActive + threads2 - 1) / threads2, 1, 1); //block的数量，维度
+            Alea.dim3 block2 = new Alea.dim3(threads2, 1, 1); //thread的数量，维度
 
-            #endregion
-            #region 从活跃voxel提取isosurface
+            if (grid2.x > 65535)
+            {
+                grid2.y = grid2.x / 32768;
+                grid2.x = 32768;
+            }
 
-            double scale = 1.0;
+            var lp2 = new LaunchParam(grid2, block2);
 
             //输出参数
             double3[] d_pos = Gpu.Default.Allocate<double3>(sumVerts);
+
+            int[] d_k = Gpu.Default.Allocate<int>(num_voxelActive);
 
             //输入参数
             Alea.int3[] d_index3d_voxelActive = Gpu.Default.Allocate<Alea.int3>(index3d_voxelActive);
@@ -491,23 +507,25 @@ namespace ALG_MarchingCubes
             double[,] d_Vertices = Gpu.Default.Allocate<double>(Vertices);
             double[] d_cubeValues2 = Gpu.Default.Allocate<double>(cubeValues);
             int[,] d_TriTable = Gpu.Default.Allocate<int>(Tables.TriangleConnectionTable);
-
+            int[] d_edgeFlags = Gpu.Default.Allocate<int>(edgeFlags);
+            double[] d_cubeValues = Gpu.Default.Allocate<double>(cubeValues);
             //共9个参数
-            gpu.Launch(generateTriangles, lp2, d_pos, d_edgeFlags, d_index3d_voxelActive, d_verts_scanIdx,  
-                d_EdgeConnection, d_EdgeDirection, d_Vertices, isoValue, scale, d_TriTable, d_cubeValues);
-
-            //var result2 = Gpu.CopyToHost(d_pos);//输出最终坐标
-
-            Gpu.FreeAllImplicitMemory();
-
-            #endregion
+            gpu.Launch(generateTriangles, lp2, d_pos, d_edgeFlags, d_index3d_voxelActive, d_verts_scanIdx,
+                d_EdgeConnection, d_EdgeDirection, d_Vertices, isoValue, scale, d_TriTable, d_cubeValues, d_k);
+            var result2 = Gpu.CopyToHost(d_k);//输出最终坐标
             //pp = ConvertDouble3ToPoint3d(result2);
-
-            List<Point3d> pts = ConvertDouble3ToPoint3d(result);
-
-            return pts;
-
         }
-        #endregion
+
+        public List<Point3d> runGPU_MC()
+        {
+
+            runClassifyVoxel();
+            runExtractActiveVoxels();
+            
+            //runComputeEdgeFlags();
+            //runComputeIsosurface();
+            List<Point3d> pts = ConvertDouble3ToPoint3d(model_voxelActive);
+            return pts;
+        }
     }
 }
