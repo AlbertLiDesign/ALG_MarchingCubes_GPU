@@ -28,13 +28,13 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddNumberParameter("offsets", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("edgeFlags", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
-            pManager.AddPointParameter("ISO", "", "", GH_ParamAccess.list);
-            pManager.AddNumberParameter("index3d", "", "", GH_ParamAccess.tree);
+            pManager.AddIntegerParameter("index3d", "", "", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -126,7 +126,7 @@ namespace ALG_MarchingCubes
                         }
                     }
                 }
-                DA.SetDataList(2, SumedgeFlags);
+                DA.SetDataList("offsets", SumedgeFlags);
             }
             else 
             {
@@ -153,22 +153,22 @@ namespace ALG_MarchingCubes
                 int[,] index3d = MCgpu.gridIndex3d;
 
                 DataTree<int> a3d = new DataTree<int>();
-                //for (int i = 0; i < index3d.GetLength(0); i++)
-                //{
-                //    GH_Path ghp = new GH_Path(i);
-                //    for (int j = 0; j < index3d.GetLength(1); j++)
-                //    {
-                //        a3d.Add(index3d[i, j], ghp);
-                //    }
-                //}
-                List<Point3d> a = MCgpu.pp;
+                for (int i = 0; i < index3d.GetLength(0); i++)
+                {
+                    GH_Path ghp = new GH_Path(i);
+                    for (int j = 0; j < index3d.GetLength(1); j++)
+                    {
+                        a3d.Add(index3d[i, j], ghp);
+                    }
+                }
+                meshVs = c;
 
+                DA.SetDataList("offsets", MCgpu.offsets);
                 DA.SetDataList("voxelOccupied", MCgpu.voxelOccupied);
                 DA.SetDataList("verts_scanIdx", MCgpu.verts_scanIdx);
                 DA.SetDataList("edgeFlags", MCgpu.edgeFlags);
                 DA.SetDataList("Pts", c);
-                DA.SetDataList("ISO", a);
-                DA.SetDataTree(7, a3d);
+                DA.SetDataTree(8, a3d);
             }
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;

@@ -88,10 +88,11 @@ namespace ALG_MarchingCubes
                 CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
                   fy + Vertices[i, 1] * Scale,
                   fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
-                cubeValue.Add(CubeValues[i]);
+                
                 //判定顶点状态，与用户指定的iso值比对
                 if (CubeValues[i] <= isovalue)
                 {
+                    cubeValue.Add(CubeValues[i]);
                     flag |= 1 << i;
                 }
             }
@@ -103,16 +104,16 @@ namespace ALG_MarchingCubes
             if (EdgeFlag == 0) return null;
 
             //找出每条边和边界的相交点，找出在这些交点处的法线量
-            for (int i = 0; i < 12; i++)
+            for (int j = 0; j < 12; j++)
             {
-                if ((EdgeFlag & (1 << i)) != 0) //如果在这条边上有交点
+                if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
                 {
-                    Offset = GetOffset(CubeValues[EdgeConnection[i, 0]], CubeValues[EdgeConnection[i, 1]], isovalue);//获得所在边的点的位置的系数
-
+                    Offset = GetOffset(CubeValues[EdgeConnection[j, 0]], CubeValues[EdgeConnection[j, 1]], isovalue);//获得所在边的点的位置的系数
+                    
                     //获取边上顶点的坐标
-                    EdgeVertex[i].X = fx + (Vertices[EdgeConnection[i, 0], 0] + Offset * EdgeDirection[i, 0]) * Scale;
-                    EdgeVertex[i].Y = fy + (Vertices[EdgeConnection[i, 0], 1] + Offset * EdgeDirection[i, 1]) * Scale;
-                    EdgeVertex[i].Z = fz + (Vertices[EdgeConnection[i, 0], 2] + Offset * EdgeDirection[i, 2]) * Scale;
+                    EdgeVertex[j].X = fx + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * Scale;
+                    EdgeVertex[j].Y = fy + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * Scale;
+                    EdgeVertex[j].Z = fz + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * Scale;
                     
                 }
             }
