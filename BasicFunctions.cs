@@ -109,19 +109,15 @@ namespace ALG_MarchingCubes
             Mesh mesh = new Mesh();
             int FCount = pts.Count / 3;
             for (int i = 0; i < FCount; i++)
-            {
-                Point3d a = pts[i * 3];
-                Point3d b = pts[i * 3 + 1];
-                Point3d c = pts[i * 3 + 2];
+          {
+              Mesh subMesh = new Mesh();
+              subMesh.Vertices.Add(pts[i * 3]);
+              subMesh.Vertices.Add(pts[i * 3 + 1]);
+              subMesh.Vertices.Add(pts[i * 3 + 2]);
+              subMesh.Faces.AddFace(0, 1, 2);
 
-                Mesh subMesh = new Mesh();
-                subMesh.Vertices.Add(a);
-                subMesh.Vertices.Add(b);
-                subMesh.Vertices.Add(c);
-                subMesh.Faces.AddFace(0, 1, 2);
-
-                mesh.Append(subMesh);
-            }
+              mesh.Append(subMesh);
+          }
             return mesh;
         }
     }

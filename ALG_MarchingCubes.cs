@@ -27,14 +27,13 @@ namespace ALG_MarchingCubes
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
             pManager.AddNumberParameter("offsets", "", "", GH_ParamAccess.list);
+            pManager.AddNumberParameter("Time", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddIntegerParameter("edgeFlags", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
             pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("index3d", "", "", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -47,17 +46,13 @@ namespace ALG_MarchingCubes
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
             bool gpu = false;
+            List<double> time = new List<double>();
 
             DA.GetDataList("Geometries",  geos);
             DA.GetData("BoundaryRatio", ref boundaryRatio);
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
             DA.GetData("GPU", ref gpu);
-
-            Stopwatch sw = new Stopwatch();
-            
-            List<double> time = new List<double>();
-            sw.Start();
 
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
@@ -90,14 +85,6 @@ namespace ALG_MarchingCubes
 
             //初始化网格数据
             List<Point3d> meshVs = new List<Point3d>();
-
-            sw.Stop();
-            double ta = sw.Elapsed.TotalMilliseconds;
-           //t_all = 304ms ta = 0.0463 tb = 292.855 ms
-
-            sw.Restart();
-
-
 
             if (gpu == false)
             {
@@ -148,19 +135,9 @@ namespace ALG_MarchingCubes
                 MCgpu.isoValue = isovalue;
                 MCgpu.samplePoints = samplePoints.ToArray();
 
-                List<Point3d> c = MCgpu.runGPU_MC();
+                List<Point3d> c = MCgpu.runGPU_MC(ref time);
 
                 int[,] index3d = MCgpu.gridIndex3d;
-
-                DataTree<int> a3d = new DataTree<int>();
-                for (int i = 0; i < index3d.GetLength(0); i++)
-                {
-                    GH_Path ghp = new GH_Path(i);
-                    for (int j = 0; j < index3d.GetLength(1); j++)
-                    {
-                        a3d.Add(index3d[i, j], ghp);
-                    }
-                }
                 meshVs = c;
 
                 DA.SetDataList("offsets", MCgpu.offsets);
@@ -168,27 +145,42 @@ namespace ALG_MarchingCubes
                 DA.SetDataList("verts_scanIdx", MCgpu.verts_scanIdx);
                 DA.SetDataList("edgeFlags", MCgpu.edgeFlags);
                 DA.SetDataList("Pts", c);
-                DA.SetDataTree(8, a3d);
             }
-            sw.Stop();
-            double tb = sw.Elapsed.TotalMilliseconds;
 
-            time.Add(ta);
-            time.Add(tb);
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
 
             Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
+            sw.Stop();
+            double ta = sw.Elapsed.TotalMilliseconds;
+
+            sw.Restart();
             GH_Mesh ghm = new GH_Mesh(mesh);
             IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(box2, box1, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
 
+            sw.Restart();
             mesh.Vertices.CombineIdentical(true, true);
             mesh.Vertices.CullUnused();
             mesh.Weld(3.1415926535897931);
+            sw.Stop();
+            double tc = sw.Elapsed.TotalMilliseconds;
+
+            sw.Restart();
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
+            sw.Stop();
+            double td = sw.Elapsed.TotalMilliseconds;
 
-            DA.SetData("Mesh", mesh);
+            time.Add(ta);
+            time.Add(tb);
+            time.Add(tc);
+            time.Add(td);
+
             DA.SetDataList("Time", time);
+            DA.SetData("Mesh", mesh);
             DA.SetDataList("Map", samplePoints);
         }
         protected override Bitmap Icon => null;
