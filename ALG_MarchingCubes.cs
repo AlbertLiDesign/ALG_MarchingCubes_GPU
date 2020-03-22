@@ -32,6 +32,7 @@ namespace ALG_MarchingCubes
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            #region 输入数据
             List<IGH_GeometricGoo> geos = new List<IGH_GeometricGoo>();
             List<IGH_GeometricGoo> new_geos = new List<IGH_GeometricGoo>();
             List<double> Weights = new List<double>();
@@ -46,7 +47,9 @@ namespace ALG_MarchingCubes
             DA.GetData("BoundaryRatio", ref boundaryRatio);
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
+            #endregion
 
+            #region 初始化MC数据
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
             Plane plane = new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.YAxis);
@@ -76,42 +79,39 @@ namespace ALG_MarchingCubes
             //转换几何数据为点数据
             samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
 
-            MarchingCubes_GPU MCgpu = new MarchingCubes_GPU();
-
-            MCgpu.SourceBox = box1;
-            MCgpu.TargetBox = box2;
-
             Alea.int3 gridS = new Alea.int3();
             gridS.x = xCount;
             gridS.y = yCount;
             gridS.z = zCount;
-            MCgpu.gridSize = gridS;
 
             Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
-            voxelS.x = 1 * scale;
-            voxelS.y = 1 * scale;
-            voxelS.z = 1 * scale;
-            MCgpu.voxelSize = voxelS;
+            voxelS.x = scale;
+            voxelS.y = scale;
+            voxelS.z = scale;
 
-            MCgpu.numVoxels = MCgpu.gridSize.x * MCgpu.gridSize.y * MCgpu.gridSize.z;
-            MCgpu.scale = scale;
-            MCgpu.isoValue = isovalue;
-            MCgpu.samplePoints = samplePoints.ToArray();
+            
+            var MCgpu = new MarchingCubes_GPU(box1, box2, gridS, voxelS,scale, isovalue, samplePoints.ToArray());
+            #endregion
 
+            #region 分类体素、扫描体素
             Stopwatch sw = new Stopwatch();
             sw.Start();
             MCgpu.runClassifyVoxel();
             MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double ta = sw.Elapsed.TotalMilliseconds;
+            #endregion
 
+            #region 提取Isosurface点集
             sw.Restart();
             List<Point3d> resultPts = new List<Point3d>();
             resultPts = MCgpu.runExtractIsoSurfaceGPU();
             //resultPts = MCgpu.runExtractIsoSurfaceCPU();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
+            #endregion
 
+            #region 提取网格、检查网格
             sw.Restart();
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
             sw.Stop();
@@ -119,7 +119,7 @@ namespace ALG_MarchingCubes
 
             sw.Restart();
             GH_Mesh ghm = new GH_Mesh(mesh);
-            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.TargetBox, MCgpu.SourceBox, ghm);
+            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.targetBox, MCgpu.sourceBox, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
             mesh.Vertices.CombineIdentical(true, true);
@@ -129,14 +129,18 @@ namespace ALG_MarchingCubes
             mesh.Normals.ComputeNormals();
             sw.Stop();
             double td = sw.Elapsed.TotalMilliseconds;
+            #endregion
 
+            #region 计算运行时间、输出数据
             time.Add(ta);
             time.Add(tb);
             time.Add(tc);
             time.Add(td);
+            
 
             DA.SetDataList("Time", time);
             DA.SetData("Mesh", mesh);
+            #endregion
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid

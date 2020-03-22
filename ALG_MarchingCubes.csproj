@@ -80,8 +80,6 @@
   <ItemGroup>
     <Compile Include="ALG_MarchingCubes.cs" />
     <Compile Include="BasicFunctions.cs" />
-    <Compile Include="ExtractIsosurface.cs" />
-    <Compile Include="ComputeVoxels.cs" />
     <Compile Include="MarchingCubes_GPU.cs" />
     <Compile Include="MarchingCubes_CPU.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
