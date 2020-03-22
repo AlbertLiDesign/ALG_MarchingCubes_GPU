@@ -27,13 +27,7 @@ namespace ALG_MarchingCubes
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
-            pManager.AddNumberParameter("offsets", "", "", GH_ParamAccess.list);
             pManager.AddNumberParameter("Time", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("voxelOccupied", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
-            pManager.AddIntegerParameter("edgeFlags", "", "", GH_ParamAccess.list);
-            pManager.AddPointParameter("Pts", "", "", GH_ParamAccess.list);
-            pManager.AddPointParameter("Map", "", "", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -48,11 +42,10 @@ namespace ALG_MarchingCubes
             bool gpu = false;
             List<double> time = new List<double>();
 
-            DA.GetDataList("Geometries",  geos);
+            DA.GetDataList("Geometries", geos);
             DA.GetData("BoundaryRatio", ref boundaryRatio);
             DA.GetData("Scale", ref scale);
             DA.GetData("isoValue", ref isovalue);
-            DA.GetData("GPU", ref gpu);
 
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
@@ -83,92 +76,55 @@ namespace ALG_MarchingCubes
             //转换几何数据为点数据
             samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
 
-            //初始化网格数据
-            List<Point3d> meshVs = new List<Point3d>();
+            MarchingCubes_GPU MCgpu = new MarchingCubes_GPU();
 
-            if (gpu == false)
-            {
-                //开始计算MC
-                List<double> SumedgeFlags = new List<double>();
-                for (int X = 0; X < xCount; X++)
-                {
-                    for (int Y = 0; Y < yCount; Y++)
-                    {
-                        for (int Z = 0; Z < zCount; Z++)
-                        {
-                            List<Point3d> pts = new List<Point3d>();
-                            List<double> ddd = new List<double>();
-                            pts = MarchingCubes_CPU.MarchCube(isovalue, X * scale, Y *scale, Z* scale, scale, samplePoints, Weights, ref ddd);
-                            if (pts != null)
-                            {
-                                foreach (var item in pts)
-                                {
-                                    meshVs.Add(item);
-                                }
-                            }
-                            foreach (var item in ddd)
-                            {
-                                SumedgeFlags.Add(item);
-                            }
-                        }
-                    }
-                }
-                DA.SetDataList("offsets", SumedgeFlags);
-            }
-            else 
-            {
-                MarchingCubes_GPU MCgpu = new MarchingCubes_GPU();
+            MCgpu.SourceBox = box1;
+            MCgpu.TargetBox = box2;
 
-                Alea.int3 gridS = new Alea.int3();
-                gridS.x = xCount;
-                gridS.y = yCount;
-                gridS.z = zCount;
-                MCgpu.gridSize = gridS;
+            Alea.int3 gridS = new Alea.int3();
+            gridS.x = xCount;
+            gridS.y = yCount;
+            gridS.z = zCount;
+            MCgpu.gridSize = gridS;
 
-                Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
-                voxelS.x = 1 * scale;
-                voxelS.y = 1 * scale;
-                voxelS.z = 1 * scale;
-                MCgpu.voxelSize = voxelS;
-                MCgpu.numVoxels = MCgpu.gridSize.x * MCgpu.gridSize.y * MCgpu.gridSize.z;
-                MCgpu.scale = scale;
-                MCgpu.isoValue = isovalue;
-                MCgpu.samplePoints = samplePoints.ToArray();
+            Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
+            voxelS.x = 1 * scale;
+            voxelS.y = 1 * scale;
+            voxelS.z = 1 * scale;
+            MCgpu.voxelSize = voxelS;
 
-                List<Point3d> c = MCgpu.runGPU_MC(ref time);
-
-                int[,] index3d = MCgpu.gridIndex3d;
-                meshVs = c;
-
-                DA.SetDataList("offsets", MCgpu.offsets);
-                DA.SetDataList("voxelOccupied", MCgpu.voxelOccupied);
-                DA.SetDataList("verts_scanIdx", MCgpu.verts_scanIdx);
-                DA.SetDataList("edgeFlags", MCgpu.edgeFlags);
-                DA.SetDataList("Pts", c);
-            }
+            MCgpu.numVoxels = MCgpu.gridSize.x * MCgpu.gridSize.y * MCgpu.gridSize.z;
+            MCgpu.scale = scale;
+            MCgpu.isoValue = isovalue;
+            MCgpu.samplePoints = samplePoints.ToArray();
 
             Stopwatch sw = new Stopwatch();
             sw.Start();
-
-            Mesh mesh = BasicFunctions.ExtractMesh(meshVs);
+            MCgpu.runClassifyVoxel();
+            MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double ta = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            GH_Mesh ghm = new GH_Mesh(mesh);
-            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(box2, box1, ghm);
-            GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
+            List<Point3d> resultPts = new List<Point3d>();
+            resultPts = MCgpu.runExtractIsoSurfaceGPU();
+            //resultPts = MCgpu.runExtractIsoSurfaceCPU();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            mesh.Vertices.CombineIdentical(true, true);
-            mesh.Vertices.CullUnused();
-            mesh.Weld(3.1415926535897931);
+            Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
             sw.Stop();
             double tc = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
+            GH_Mesh ghm = new GH_Mesh(mesh);
+            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.TargetBox, MCgpu.SourceBox, ghm);
+            GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
+
+            mesh.Vertices.CombineIdentical(true, true);
+            mesh.Vertices.CullUnused();
+            mesh.Weld(3.1415926535897931);
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
             sw.Stop();
@@ -181,7 +137,6 @@ namespace ALG_MarchingCubes
 
             DA.SetDataList("Time", time);
             DA.SetData("Mesh", mesh);
-            DA.SetDataList("Map", samplePoints);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid

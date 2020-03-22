@@ -234,7 +234,7 @@ namespace ALG_MarchingCubes
         }
         #endregion
         public void classifyVoxel(double3[] voxelV, int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
-            int numVoxels, double3 voxelSize, double isoValue, double3[] samplePts,int[] VertsTable, Alea.int3[] gridIdx)
+            int numVoxels, double3 voxelSize, double isoValue,double scale, double3[] samplePts,int[] VertsTable, Alea.int3[] gridIdx)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
@@ -244,9 +244,9 @@ namespace ALG_MarchingCubes
             gridIdx[i] = gridPos;
             double3 p = new double3();
 
-            p.x = gridPos.x * voxelSize.x;
-            p.y = gridPos.y * voxelSize.y;
-            p.z = gridPos.z * voxelSize.z;
+            p.x = gridPos.x * voxelSize.x* scale;
+            p.y = gridPos.y * voxelSize.y* scale;
+            p.z = gridPos.z * voxelSize.z* scale;
 
             //输出所有顶点
             voxelV[i*8] = p;
@@ -371,7 +371,7 @@ namespace ALG_MarchingCubes
             int[] d_VertsTable = gpu.Allocate<int>(Tables.VertsTable);
 
             gpu.Launch(classifyVoxel, lp,d_voxelV, d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue, d_samplePts, d_VertsTable, d_gridIdx);
+                gridSize, numVoxels, voxelSize, isoValue,scale, d_samplePts, d_VertsTable, d_gridIdx);
             
             //所有单元
             result_voxelV = Gpu.CopyToHost(d_voxelV);
@@ -558,14 +558,14 @@ namespace ALG_MarchingCubes
             gpu.For(0, num_voxelActive, i =>
              {
                  //判定顶点状态，与用户指定的iso值比对
-                 d_cubeValues[i * 8] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8]);
-                 d_cubeValues[i * 8 + 1] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 1]);
-                 d_cubeValues[i * 8 + 2] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 2]);
-                 d_cubeValues[i * 8 + 3] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 3]);
-                 d_cubeValues[i * 8 + 4] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 4]);
-                 d_cubeValues[i * 8 + 5] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 5]);
-                 d_cubeValues[i * 8 + 6] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 6]);
-                 d_cubeValues[i * 8 + 7] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 7]);
+                 d_cubeValues[i * 8] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 1] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 1]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 2] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 2]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 3] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 3]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 4] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 4]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 5] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 5]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 6] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 6]) * d_numbers[1];
+                 d_cubeValues[i * 8 + 7] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 7]) * d_numbers[1];
 
                  int flag = Compact(d_cubeValues[i * 8], d_numbers[0]);
                  flag += Compact(d_cubeValues[i * 8 + 1], d_numbers[0]) * 2;

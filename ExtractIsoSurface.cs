@@ -43,34 +43,17 @@ namespace ALG_MarchingCubes
                 resultPts= MCgpu.runExtractIsoSurfaceCPU();
             }
 
-            List<Point3d> pts = MCgpu.ConvertDouble3ToPoint3d(MCgpu.model_voxelActive);
+            Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
 
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-
-            Mesh mesh = BasicFunctions.ExtractMesh(pts);
-            sw.Stop();
-            double ta = sw.Elapsed.TotalMilliseconds;
-
-            sw.Restart();
             GH_Mesh ghm = new GH_Mesh(mesh);
             IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.TargetBox, MCgpu.SourceBox, ghm);
             GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
-            sw.Stop();
-            double tb = sw.Elapsed.TotalMilliseconds;
 
-            sw.Restart();
             mesh.Vertices.CombineIdentical(true, true);
             mesh.Vertices.CullUnused();
             mesh.Weld(3.1415926535897931);
-            sw.Stop();
-            double tc = sw.Elapsed.TotalMilliseconds;
-
-            sw.Restart();
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
-            sw.Stop();
-            double td = sw.Elapsed.TotalMilliseconds;
 
             DA.SetData("Mesh", mesh);
         }
