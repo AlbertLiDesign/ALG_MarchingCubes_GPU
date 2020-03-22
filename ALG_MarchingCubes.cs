@@ -84,13 +84,13 @@ namespace ALG_MarchingCubes
             gridS.y = yCount;
             gridS.z = zCount;
 
-            Alea.CudaToolkit.double3 voxelS = new Alea.CudaToolkit.double3();
-            voxelS.x = scale;
-            voxelS.y = scale;
-            voxelS.z = scale;
+            Alea.float3 voxelS = new Alea.float3();
+            voxelS.x = (float)scale;
+            voxelS.y = (float)scale;
+            voxelS.z = (float)scale;
 
             
-            var MCgpu = new MarchingCubes_GPU(box1, box2, gridS, voxelS,scale, isovalue, samplePoints.ToArray());
+            var MCgpu = new MarchingCubes_GPU(box1, box2, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
             #endregion
 
             #region 分类体素、扫描体素

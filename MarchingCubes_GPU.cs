@@ -13,6 +13,9 @@ using Alea.CSharp;
 using Alea.Parallel;
 using System.Threading;
 using System.Diagnostics;
+using float3 = Alea.float3;
+using int3 = Alea.int3;
+using float4 = Alea.float4;
 
 namespace ALG_MarchingCubes
 {
@@ -26,36 +29,36 @@ namespace ALG_MarchingCubes
         public  int numVoxels = 0;
         public  int maxVerts = 0;
 
-        public double3 voxelSize;
-        public double isoValue = 0.2;
+        public float3 voxelSize;
+        public float isoValue;
 
-        public  Alea.int3 gridSize;
+        public  int3 gridSize;
         public int[,] gridIndex3d;
 
         //采样点
-        double3[] samplePts;
+        float3[] samplePts;
 
         //voxel在grid中的索引
-        public Alea.int3[] gridIdx;
+        public int3[] gridIdx;
         //活跃voxel在grid中的索引
-        public Alea.int3[] index3d_voxelActive;
+        public int3[] index3d_voxelActive;
         //所有voxel顶点坐标
-        public double3[] result_voxelV;
+        public float3[] result_voxelV;
 
         //活跃voxel的顶点总数
         public int sumVerts;
         //活跃voxel数量
         public int num_voxelActive;
         //活跃voxel的顶点坐标
-        public double3[] model_voxelActive;
+        public float3[] model_voxelActive;
 
         //所有voxel的状态
         public int[] cubeindices;
         //voxel缩放倍率
-        public double scale;
+        public float scale;
 
         public List<Point3d> pp;
-        public double[] cubeValues;
+        public float[] cubeValues;
         public int[] cudaIndex;
         public Point3d[] samplePoints;
         public int[] voxelVerts;
@@ -64,8 +67,8 @@ namespace ALG_MarchingCubes
         public int[] voxelOccupied = null;
 
         public MarchingCubes_GPU() { }
-        public MarchingCubes_GPU(Box sourceBox, Box targetBox, Alea.int3 gridSize, double3 voxelSize,
-            double scale, double isoValue,Point3d[] samplePoints)
+        public MarchingCubes_GPU(Box sourceBox, Box targetBox, int3 gridSize, float3 voxelSize,
+            float scale, float isoValue,Point3d[] samplePoints)
         {
             this.sourceBox = sourceBox;
             this.targetBox = targetBox;
@@ -77,10 +80,10 @@ namespace ALG_MarchingCubes
             this.samplePoints = samplePoints;
         }
 
-        private static double[,] Vertices = new double[8, 3]
+        private static float[,] Vertices = new float[8, 3]
          {
-             {0.0, 0.0, 0.0},{1.0, 0.0, 0.0},{1.0, 1.0, 0.0},{0.0, 1.0, 0.0},
-             {0.0, 0.0, 1.0},{1.0, 0.0, 1.0},{1.0, 1.0, 1.0},{0.0, 1.0, 1.0}
+             {0.0f, 0.0f, 0.0f},{1.0f, 0.0f, 0.0f},{1.0f, 1.0f, 0.0f},{0.0f, 1.0f, 0.0f},
+             {0.0f, 0.0f, 1.0f},{1.0f, 0.0f, 1.0f},{1.0f, 1.0f, 1.0f},{0.0f, 1.0f, 1.0f}
          };
         private int[,] EdgeConnection = new int[12, 2]
         {
@@ -88,26 +91,26 @@ namespace ALG_MarchingCubes
              {4,5}, {5,6}, {6,7}, {7,4},
              {0,4}, {1,5}, {2,6}, {3,7}
          };
-        private double[,] EdgeDirection = new double[12, 3]
+        private float[,] EdgeDirection = new float[12, 3]
          {
-            {1.0, 0.0, 0.0},{0.0, 1.0, 0.0},{-1.0, 0.0, 0.0},{0.0, -1.0, 0.0},
-            {1.0, 0.0, 0.0},{0.0, 1.0, 0.0},{-1.0, 0.0, 0.0},{0.0, -1.0, 0.0},
-            {0.0, 0.0, 1.0},{0.0, 0.0, 1.0},{ 0.0, 0.0, 1.0},{0.0, 0.0, 1.0}
+            {1.0f, 0.0f, 0.0f},{0.0f, 1.0f, 0.0f},{-1.0f, 0.0f, 0.0f},{0.0f, -1.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},{0.0f, 1.0f, 0.0f},{-1.0f, 0.0f, 0.0f},{0.0f, -1.0f, 0.0f},
+            {0.0f, 0.0f, 1.0f},{0.0f, 0.0f, 1.0f},{ 0.0f, 0.0f, 1.0f},{0.0f, 0.0f, 1.0f}
          };
 
         #region basic functions
-        private double3[] ConvertPointsToDouble3(Point3d[] pts)
+        private float3[] ConvertPointsToFloat3(Point3d[] pts)
         {
-            double3[] d = new double3[pts.Length];
+            float3[] d = new float3[pts.Length];
             for (int i = 0; i < pts.Length; i++)
             {
-                d[i].x = pts[i].X;
-                d[i].y = pts[i].Y;
-                d[i].z = pts[i].Z;
+                d[i].x = (float)pts[i].X;
+                d[i].y = (float)pts[i].Y;
+                d[i].z = (float)pts[i].Z;
             }
             return d;
         }
-        public int[,] ConvertInt3ToIntArray(Alea.int3[] a)
+        public int[,] ConvertInt3ToIntArray(int3[] a)
         {
             int[,] b = new int[a.Length, 3];
             for (int i = 0; i < a.Length; i++)
@@ -119,7 +122,7 @@ namespace ALG_MarchingCubes
             return b;
 
         }
-        public List<Point3d> ConvertDouble3ToPoint3d(double3[] array)
+        public List<Point3d> ConvertFloat3ToPoint3d(float3[] array)
         {
             List<Point3d> pts = new List<Point3d>();
             for (int i = 0; i < array.Length; i++)
@@ -128,7 +131,7 @@ namespace ALG_MarchingCubes
             }
             return pts;
         }
-        public List<Point3d> ConvertDouble4ToPoint3d(double4[] array)
+        public List<Point3d> ConvertFloat4ToPoint3d(float4[] array)
         {
             List<Point3d> pts = new List<Point3d>();
             for (int i = 0; i < array.Length; i++)
@@ -137,7 +140,7 @@ namespace ALG_MarchingCubes
             }
             return pts;
         }
-        public int Compact(double a, double b)
+        public int Compact(float a, float b)
         {
             if (a < b)
             {
@@ -153,28 +156,28 @@ namespace ALG_MarchingCubes
         
 
         //点的线性插值函数
-        private double3 lerp(double3 a, double3 b, double t)
+        private float3 lerp(float3 a, float3 b, float t)
         {
-            return CreateDouble3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
+            return CreateFloat3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
         }
         //浮点数的线性插值函数
-        private double lerp(double a, double b, double t)
+        private float lerp(float a, float b, float t)
         {
             return a + t * (b - a);
         }
         //MC顶点的线性插值
-        private double3 vertexInterp(double isolevel, double3 p0, double3 p1, float f0, float f1)
+        private float3 vertexInterp(float isolevel, float3 p0, float3 p1, float f0, float f1)
         {
-            double t = (isolevel - f0) / (f1 - f0);
+            float t = (isolevel - f0) / (f1 - f0);
             return lerp(p0, p1, t);
         }
 
         // 计算边上的线性插值顶点
-        private double3 vertexInterp2(double isolevel, double3 p0, double3 p1, double4 f0, double4 f1)
+        private float3 vertexInterp2(float isolevel, float3 p0, float3 p1, float4 f0, float4 f1)
         {
-            
-            double t = (isolevel - f0.w) / (f1.w - f0.w);
-            double3 p = lerp(p0, p1, t);
+
+            float t = (isolevel - f0.w) / (f1.w - f0.w);
+            float3 p = lerp(p0, p1, t);
             //n.x = lerp(f0.x, f1.x, t);
             //n.y = lerp(f0.y, f1.y, t);
             //n.z = lerp(f0.z, f1.z, t);
@@ -183,10 +186,10 @@ namespace ALG_MarchingCubes
         }
         //定义一个场函数，输入xyz坐标，返回一个值
         //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
-        private double tangle(double3[] samplePts, double x, double y, double z)
+        private float tangle(float3[] samplePts, float x, float y, float z)
         {
-            double result = 0.0;
-            double Dx, Dy, Dz;
+            float result = 0.0f;
+            float Dx, Dy, Dz;
 
             for (int j = 0; j < samplePts.Length; j++)
             {
@@ -200,9 +203,9 @@ namespace ALG_MarchingCubes
         }
 
         //根据一维索引计算在三维grid中的位置
-        private Alea.int3 calcGridPos(int i, Alea.int3 gridSize)
+        private int3 calcGridPos(int i, int3 gridSize)
         {
-            Alea.int3 gridPos;
+            int3 gridPos;
 
             gridPos.z = i / (gridSize.x * gridSize.y);
             gridPos.y = i % (gridSize.x * gridSize.y) / gridSize.x;
@@ -210,19 +213,19 @@ namespace ALG_MarchingCubes
 
             return gridPos;
         }
-        public double3 CreateDouble3(double x, double y, double z)
+        public float3 CreateFloat3(float x, float y, float z)
         {
-            double3 p = new double3();
+            float3 p = new float3();
             p.x = x;
             p.y = y;
             p.z = z;
             return p;
         }
 
-        public double ComputeValue(double3[] samplePts, double3 testP)
+        public float ComputeValue(float3[] samplePts, float3 testP)
         {
-            double result = 0.0;
-            double Dx, Dy, Dz;
+            float result = 0.0f;
+            float Dx, Dy, Dz;
 
             for (int j = 0; j < samplePts.Length; j++)
             {
@@ -234,24 +237,24 @@ namespace ALG_MarchingCubes
             }
             return result;
         }
-        public double GetOffset(double Value1, double Value2, double ValueDesired)
+        public float GetOffset(float Value1, float Value2, float ValueDesired)
         {
-            if ((Value2 - Value1) == 0.0)
-                return 0.5;
+            if ((Value2 - Value1) == 0.0f)
+                return 0.5f;
 
             return (ValueDesired - Value1) / (Value2 - Value1);
         }
         #endregion
-        public void classifyVoxel(double3[] voxelV, int[] voxelVerts, int[] voxelOccupied, Alea.int3 gridSize,
-            int numVoxels, double3 voxelSize, double isoValue,double scale, double3[] samplePts,int[] VertsTable, Alea.int3[] gridIdx)
+        public void classifyVoxel(float3[] voxelV, int[] voxelVerts, int[] voxelOccupied, int3 gridSize,
+            int numVoxels, float3 voxelSize, float isoValue,float scale, float3[] samplePts,int[] VertsTable, int3[] gridIdx)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
 
             //计算grid中的位置
-            Alea.int3 gridPos = calcGridPos(i, gridSize);
+            int3 gridPos = calcGridPos(i, gridSize);
             gridIdx[i] = gridPos;
-            double3 p = new double3();
+            float3 p = new float3();
 
             p.x = gridPos.x * voxelSize.x* scale;
             p.y = gridPos.y * voxelSize.y* scale;
@@ -259,23 +262,23 @@ namespace ALG_MarchingCubes
 
             //输出所有顶点
             voxelV[i*8] = p;
-            voxelV[i*8+1] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, 0 + p.z);
-            voxelV[i*8+2] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+3] = CreateDouble3(0 + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+4] = CreateDouble3(0 + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+5] = CreateDouble3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+6] = CreateDouble3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-            voxelV[i*8+7] = CreateDouble3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+            voxelV[i*8+1] = CreateFloat3(voxelSize.x + p.x, 0 + p.y, 0 + p.z);
+            voxelV[i*8+2] = CreateFloat3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z);
+            voxelV[i*8+3] = CreateFloat3(0 + p.x, voxelSize.y + p.y, 0 + p.z);
+            voxelV[i*8+4] = CreateFloat3(0 + p.x, 0 + p.y, voxelSize.z + p.z);
+            voxelV[i*8+5] = CreateFloat3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z);
+            voxelV[i*8+6] = CreateFloat3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+            voxelV[i*8+7] = CreateFloat3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
 
             //计算cube中的8个点对应的value
-            double d0 = ComputeValue(samplePts, voxelV[i * 8]);
-            double d1 = ComputeValue(samplePts, voxelV[i * 8 + 1]);
-            double d2 = ComputeValue(samplePts, voxelV[i * 8 + 2]);
-            double d3 = ComputeValue(samplePts, voxelV[i * 8 + 3]);
-            double d4 = ComputeValue(samplePts, voxelV[i * 8 + 4]);
-            double d5 = ComputeValue(samplePts, voxelV[i * 8 + 5]);
-            double d6 = ComputeValue(samplePts, voxelV[i * 8 + 6]);
-            double d7 = ComputeValue(samplePts, voxelV[i * 8 + 7]);
+            float d0 = ComputeValue(samplePts, voxelV[i * 8]);
+            float d1 = ComputeValue(samplePts, voxelV[i * 8 + 1]);
+            float d2 = ComputeValue(samplePts, voxelV[i * 8 + 2]);
+            float d3 = ComputeValue(samplePts, voxelV[i * 8 + 3]);
+            float d4 = ComputeValue(samplePts, voxelV[i * 8 + 4]);
+            float d5 = ComputeValue(samplePts, voxelV[i * 8 + 5]);
+            float d6 = ComputeValue(samplePts, voxelV[i * 8 + 6]);
+            float d7 = ComputeValue(samplePts, voxelV[i * 8 + 7]);
 
             //判定它们的状态
             int cubeindex;
@@ -317,13 +320,13 @@ namespace ALG_MarchingCubes
             var gpu = Gpu.Default;
             var lp = new LaunchParam(grid, block);
 
-            samplePts = ConvertPointsToDouble3(samplePoints);
+            samplePts = ConvertPointsToFloat3(samplePoints);
 
             int[] d_voxelVerts = gpu.Allocate<int>(numVoxels);
             int[] d_voxelOccupied = gpu.Allocate<int>(numVoxels);
-            double3[] d_voxelV = gpu.Allocate<double3>(numVoxels*8);
-            double3[] d_samplePts = gpu.Allocate<double3>(samplePts);
-            Alea.int3[] d_gridIdx = gpu.Allocate<Alea.int3>(numVoxels);
+            float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8);
+            float3[] d_samplePts = gpu.Allocate<float3>(samplePts);
+            int3[] d_gridIdx = gpu.Allocate<int3>(numVoxels);
             int[] d_VertsTable = gpu.Allocate<int>(Tables.VertsTable);
 
             gpu.Launch(classifyVoxel, lp,d_voxelV, d_voxelVerts, d_voxelOccupied,
@@ -353,7 +356,7 @@ namespace ALG_MarchingCubes
             var gpu = Gpu.Default;
             //计算活跃voxel的个数
             List<int> index_voxelActiveList = new List<int>();
-            List<Alea.int3> index3d_voxelActiveList = new List<Alea.int3>();
+            List<int3> index3d_voxelActiveList = new List<int3>();
 
             for (int i = 0; i < voxelOccupied.Length; i++)
             {
@@ -371,7 +374,7 @@ namespace ALG_MarchingCubes
             index3d_voxelActive = index3d_voxelActiveList.ToArray();
             gridIndex3d = ConvertInt3ToIntArray(index3d_voxelActive);
             //活跃voxel模型
-            model_voxelActive = new double3[8 * num_voxelActive];
+            model_voxelActive = new float3[8 * num_voxelActive];
             //活跃voxel中的顶点数
             verts_voxelActive = new int[num_voxelActive];
             //总顶点数
@@ -426,7 +429,7 @@ namespace ALG_MarchingCubes
         }
         public List<Point3d> runExtractIsoSurfaceCPU()
         {
-            cubeValues = new double[8 * num_voxelActive];
+            cubeValues = new float[8 * num_voxelActive];
 
             Point3d[] Apts = new Point3d[sumVerts];
 
@@ -461,7 +464,7 @@ namespace ALG_MarchingCubes
                 {
                     if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
                     {
-                        double Offset = GetOffset(cubeValues[i * 8 + EdgeConnection[j, 0]], cubeValues[i * 8 + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
+                        float Offset = GetOffset(cubeValues[i * 8 + EdgeConnection[j, 0]], cubeValues[i * 8 + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
                         Point3d pt = new Point3d();
                         //获取边上顶点的坐标
                         pt.X = index3d_voxelActive[i].x + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
@@ -494,26 +497,26 @@ namespace ALG_MarchingCubes
         {
             var gpu = Gpu.Default;
 
-            double3[] pts = new double3[12 * num_voxelActive];
-            double3[] d_pts = Gpu.Default.Allocate<double3>(pts);
-            double3[] Apts = Gpu.Default.Allocate<double3>(sumVerts);
+            float3[] pts = new float3[12 * num_voxelActive];
+            float3[] d_pts = Gpu.Default.Allocate<float3>(pts);
+            float3[] Apts = Gpu.Default.Allocate<float3>(sumVerts);
 
-            Alea.int3[] d_index3d_voxelActive = Gpu.Default.Allocate<Alea.int3>(index3d_voxelActive);
-            double3[] d_model_voxelActive = Gpu.Default.Allocate<double3>(model_voxelActive);
-            double3[] d_samplePts = Gpu.Default.Allocate<double3>(samplePts);
-            double[] d_cubeValues = Gpu.Default.Allocate<double>(8 * num_voxelActive);
+            int3[] d_index3d_voxelActive = Gpu.Default.Allocate<int3>(index3d_voxelActive);
+            float3[] d_model_voxelActive = Gpu.Default.Allocate<float3>(model_voxelActive);
+            float3[] d_samplePts = Gpu.Default.Allocate<float3>(samplePts);
+            float[] d_cubeValues = Gpu.Default.Allocate<float>(8 * num_voxelActive);
             int[] d_verts_scanIdx = Gpu.Default.Allocate<int>(verts_scanIdx);
 
-            double[,] d_Vertices = Gpu.Default.Allocate<double>(Vertices);
-            double[,] d_EdgeDirection = Gpu.Default.Allocate<double>(EdgeDirection);
+            float[,] d_Vertices = Gpu.Default.Allocate<float>(Vertices);
+            float[,] d_EdgeDirection = Gpu.Default.Allocate<float>(EdgeDirection);
             int[,] d_EdgeConnection = Gpu.Default.Allocate<int>(EdgeConnection);
             int[,] d_TriTable = Gpu.Default.Allocate<int>(Tables.TriangleConnectionTable);
             int[] d_EdgeTable = Gpu.Default.Allocate<int>(Tables.CubeEdgeFlags);
 
-            double[] numbers = new double[2];
+            float[] numbers = new float[2];
             numbers[0] = isoValue;
             numbers[1] = scale;
-            double[] d_numbers = Gpu.Default.Allocate<double>(numbers);
+            float[] d_numbers = Gpu.Default.Allocate<float>(numbers);
 
             gpu.For(0, num_voxelActive, i =>
              {
@@ -544,8 +547,8 @@ namespace ALG_MarchingCubes
                  {
                      if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
                     {
-                         double Offset = GetOffset(d_cubeValues[i * 8 + d_EdgeConnection[j, 0]], d_cubeValues[i * 8 + d_EdgeConnection[j, 1]], d_numbers[0]);//获得所在边的点的位置的系数
-                        double3 pt = new double3();
+                         float Offset = GetOffset(d_cubeValues[i * 8 + d_EdgeConnection[j, 0]], d_cubeValues[i * 8 + d_EdgeConnection[j, 1]], d_numbers[0]);//获得所在边的点的位置的系数
+                         float3 pt = new float3();
                         //获取边上顶点的坐标
                         pt.x = d_index3d_voxelActive[i].x + (d_Vertices[d_EdgeConnection[j, 0], 0] + Offset * d_EdgeDirection[j, 0]) * d_numbers[1];
                          pt.y = d_index3d_voxelActive[i].y + (d_Vertices[d_EdgeConnection[j, 0], 1] + Offset * d_EdgeDirection[j, 1]) * d_numbers[1];
@@ -563,14 +566,14 @@ namespace ALG_MarchingCubes
                      for (int Corner = 0; Corner < 3; Corner++)
                      { 
                          int Vertex = d_TriTable[flag, 3 * Triangle + Corner];
-                         double3 pd = CreateDouble3(d_pts[12*i+Vertex].x, d_pts[12 * i + Vertex].y, d_pts[12 * i + Vertex].z);
+                         float3 pd = CreateFloat3(d_pts[12*i+Vertex].x, d_pts[12 * i + Vertex].y, d_pts[12 * i + Vertex].z);
                          Apts[d_verts_scanIdx[i] + num] = pd;
                          num++;
                      }
                  }
              });
             var result_Scan = Gpu.CopyToHost(Apts);
-            return ConvertDouble3ToPoint3d(result_Scan);
+            return ConvertFloat3ToPoint3d(result_Scan);
         }
 
         public List<Point3d> runGPU_MC(ref List<double> time)
