@@ -64,7 +64,7 @@ namespace ALG_MarchingCubes
 
         public static List<Point3d> MarchCube(double isovalue, double fx, double fy, double fz, double Scale, List<Point3d> SamplePoints, List<double> Weights, ref List<double> cubeValue)
         {
-            //检查权重
+            //check weights
             if (Weights.Count < SamplePoints.Count)
             {
                 List<double> average = new List<double>();
@@ -81,36 +81,36 @@ namespace ALG_MarchingCubes
             int flag = 0;
             int EdgeFlag = 0;
 
-            //生成每个Box的模型
             for (int i = 0; i < 8; i++)
             {
-                //计算CubeValue，即每个box的8个顶点的iso值
+                //Compute cubeValues of 8 vertices
                 CubeValues[i] = Dist(fx + Vertices[i, 0] * Scale,
                   fy + Vertices[i, 1] * Scale,
                   fz + Vertices[i, 2] * Scale, SamplePoints, Weights);
-                
-                //判定顶点状态，与用户指定的iso值比对
+
+                //Check each vertex state
                 if (CubeValues[i] <= isovalue)
                 {
                     cubeValue.Add(CubeValues[i]);
                     flag |= 1 << i;
                 }
             }
-            //找到哪些几条边和边界相交
+            //find out which edge intersects the isosurface
             EdgeFlag = Tables.CubeEdgeFlags[flag];
 
 
-            //如果整个立方体都在边界内，则没有交点
+            //check whether this voxel is crossed by the isosurface
             if (EdgeFlag == 0) return null;
 
-            //找出每条边和边界的相交点，找出在这些交点处的法线量
             for (int j = 0; j < 12; j++)
             {
-                if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
+                //check whether an edge have a point
+                if ((EdgeFlag & (1 << j)) != 0) 
                 {
-                    Offset = GetOffset(CubeValues[EdgeConnection[j, 0]], CubeValues[EdgeConnection[j, 1]], isovalue);//获得所在边的点的位置的系数
+                    //compute t values from two end points on each edge
+                    Offset = GetOffset(CubeValues[EdgeConnection[j, 0]], CubeValues[EdgeConnection[j, 1]], isovalue);
                     
-                    //获取边上顶点的坐标
+                    //get positions
                     EdgeVertex[j].X = fx + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * Scale;
                     EdgeVertex[j].Y = fy + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * Scale;
                     EdgeVertex[j].Z = fz + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * Scale;
@@ -118,7 +118,7 @@ namespace ALG_MarchingCubes
                 }
             }
 
-            //画出找到的三角形
+            //Find out points from each triangle
             for (int Triangle = 0; Triangle < 5; Triangle++)
             {
                 if (Tables.TriangleConnectionTable[flag, 3 * Triangle] < 0)

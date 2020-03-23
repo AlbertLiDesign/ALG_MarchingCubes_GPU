@@ -21,13 +21,12 @@ namespace ALG_MarchingCubes
 {
     public class MarchingCubes_GPU
     {
+        // boxs for mapping
         public Box sourceBox;
         public Box targetBox;
-        public int[] cubeSum;
 
         // constants
         public  int numVoxels = 0;
-        public  int maxVerts = 0;
 
         public float3 voxelSize;
         public float isoValue;
@@ -35,36 +34,32 @@ namespace ALG_MarchingCubes
         public  int3 gridSize;
         public int[,] gridIndex3d;
 
-        //采样点
+        // sample points
         float3[] samplePts;
+        public Point3d[] samplePoints;
 
-        //voxel在grid中的索引
+        // the index of voxel in the grid
         public int3[] gridIdx;
-        //活跃voxel在grid中的索引
+        // the index of active voxel in the grid
         public int3[] index3d_voxelActive;
-        //所有voxel顶点坐标
+        // the vertex positions of all voxels 
         public float3[] result_voxelV;
 
-        //活跃voxel的顶点总数
+        // the number of all vertices
         public int sumVerts;
-        //活跃voxel数量
+        // the number of active voxels
         public int num_voxelActive;
-        //活跃voxel的顶点坐标
+        // the positions of all active voxel vertices
         public float3[] model_voxelActive;
 
-        //所有voxel的状态
-        public int[] cubeindices;
-        //voxel缩放倍率
+        //voxel scale
         public float scale;
 
-        public List<Point3d> pp;
         public float[] cubeValues;
-        public int[] cudaIndex;
-        public Point3d[] samplePoints;
         public int[] voxelVerts;
         public int[] verts_voxelActive;
         public int[] verts_scanIdx;
-        public int[] voxelOccupied = null;
+        public int[] voxelOccupied;
 
         public MarchingCubes_GPU() { }
         public MarchingCubes_GPU(Box sourceBox, Box targetBox, int3 gridSize, float3 voxelSize,
@@ -120,7 +115,6 @@ namespace ALG_MarchingCubes
                 b[i, 2] = a[i].z;
             }
             return b;
-
         }
         public List<Point3d> ConvertFloat3ToPoint3d(float3[] array)
         {
@@ -140,51 +134,9 @@ namespace ALG_MarchingCubes
             }
             return pts;
         }
-        public int Compact(float a, float b)
-        {
-            if (a < b)
-            {
-                return 1;
-            }
-            else
-            {
-                return 0;
-            }
-        }
-        public int Sum(int a, int b) { return a + b; }
+        public int Compact(float a, float b) { if (a < b) { return 1; } else { return 0; } }
 
-        
-
-        //点的线性插值函数
-        private float3 lerp(float3 a, float3 b, float t)
-        {
-            return CreateFloat3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
-        }
-        //浮点数的线性插值函数
-        private float lerp(float a, float b, float t)
-        {
-            return a + t * (b - a);
-        }
-        //MC顶点的线性插值
-        private float3 vertexInterp(float isolevel, float3 p0, float3 p1, float f0, float f1)
-        {
-            float t = (isolevel - f0) / (f1 - f0);
-            return lerp(p0, p1, t);
-        }
-
-        // 计算边上的线性插值顶点
-        private float3 vertexInterp2(float isolevel, float3 p0, float3 p1, float4 f0, float4 f1)
-        {
-
-            float t = (isolevel - f0.w) / (f1.w - f0.w);
-            float3 p = lerp(p0, p1, t);
-            //n.x = lerp(f0.x, f1.x, t);
-            //n.y = lerp(f0.y, f1.y, t);
-            //n.z = lerp(f0.z, f1.z, t);
-
-            return p;
-        }
-        //定义一个场函数，输入xyz坐标，返回一个值
+        //compute distance
         //v = ((3x)^4 - 5(3x)^2 - 5(3y)^2 + (3z)^4 - 5(z)^2 + 11.8) * 0.2 + 0.5
         private float tangle(float3[] samplePts, float x, float y, float z)
         {
@@ -202,7 +154,7 @@ namespace ALG_MarchingCubes
             return result;
         }
 
-        //根据一维索引计算在三维grid中的位置
+        //compute 3d index of each voxel on the grid according to 1d index
         private int3 calcGridPos(int i, int3 gridSize)
         {
             int3 gridPos;
@@ -256,9 +208,9 @@ namespace ALG_MarchingCubes
             gridIdx[i] = gridPos;
             float3 p = new float3();
 
-            p.x = gridPos.x * voxelSize.x* scale;
-            p.y = gridPos.y * voxelSize.y* scale;
-            p.z = gridPos.z * voxelSize.z* scale;
+            p.x = gridPos.x * voxelSize.x * scale;
+            p.y = gridPos.y * voxelSize.y * scale;
+            p.z = gridPos.z * voxelSize.z * scale;
 
             //输出所有顶点
             voxelV[i*8] = p;
@@ -303,7 +255,7 @@ namespace ALG_MarchingCubes
             }
         }
 
-        //计算所有voxel的活跃度
+        //classify all voxels according to their activity
         public void runClassifyVoxel()
         { 
             //多kernel的通用线程管理
@@ -350,7 +302,7 @@ namespace ALG_MarchingCubes
 
             gpu.Synchronize();
         }
-        //压缩voxel，提取活跃voxel
+        //reduce empty voxel and extract active voxels
         public void runExtractActiveVoxels()
         {
             var gpu = Gpu.Default;
@@ -393,14 +345,14 @@ namespace ALG_MarchingCubes
                  model_voxelActive[8 * i + 7] = result_voxelV[8 * index_voxelActive[i] + 7];
                  verts_voxelActive[i] = voxelVerts[index_voxelActive[i]];
              });
-            
+
             //扫描以获得最终点索引
-            Func<int, int, int> op = Sum;
+            var op = new Func<int, int, int>((a, b) => { return a + b; });
             Alea.Session session = new Alea.Session(gpu);
             int[] d_verts_voxelActive = Gpu.Default.Allocate<int>(verts_voxelActive);
             int[] d_voxelVertsScan = Gpu.Default.Allocate<int>(verts_voxelActive.Length);
 
-            Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_verts_voxelActive, 0, Sum, num_voxelActive);
+            Alea.Parallel.GpuExtension.Scan<int>(session, d_voxelVertsScan, d_verts_voxelActive, 0, op, num_voxelActive);
 
             var result_Scan = Gpu.CopyToHost(d_voxelVertsScan);
 
@@ -427,6 +379,7 @@ namespace ALG_MarchingCubes
 
             gpu.Synchronize(); 
         }
+        //extract isosurface points using CPU
         public List<Point3d> runExtractIsoSurfaceCPU()
         {
             cubeValues = new float[8 * num_voxelActive];
@@ -434,10 +387,9 @@ namespace ALG_MarchingCubes
             Point3d[] Apts = new Point3d[sumVerts];
 
             Parallel.For(0, num_voxelActive, i =>
-            //for (int i = 0; i < num_voxelActive; i++)
             {
                 Point3d[] pts = new Point3d[12];
-                //判定顶点状态，与用户指定的iso值比对
+                //Compute cubeValues of 8 vertices
                 cubeValues[i * 8] = ComputeValue(samplePts, model_voxelActive[i * 8]);
                 cubeValues[i * 8 + 1] = ComputeValue(samplePts, model_voxelActive[i * 8 + 1]);
                 cubeValues[i * 8 + 2] = ComputeValue(samplePts, model_voxelActive[i * 8 + 2]);
@@ -447,6 +399,7 @@ namespace ALG_MarchingCubes
                 cubeValues[i * 8 + 6] = ComputeValue(samplePts, model_voxelActive[i * 8 + 6]);
                 cubeValues[i * 8 + 7] = ComputeValue(samplePts, model_voxelActive[i * 8 + 7]);
 
+                //Check each vertex state
                 int flag = Compact(cubeValues[i * 8], isoValue);
                 flag += Compact(cubeValues[i * 8 + 1], isoValue) * 2;
                 flag += Compact(cubeValues[i * 8 + 2], isoValue) * 4;
@@ -456,17 +409,18 @@ namespace ALG_MarchingCubes
                 flag += Compact(cubeValues[i * 8 + 6], isoValue) * 64;
                 flag += Compact(cubeValues[i * 8 + 7], isoValue) * 128;
 
-                //找到哪些几条边和边界相交
+                //find out which edge intersects the isosurface
                 int EdgeFlag = Tables.CubeEdgeFlags[flag];
 
-                //找出每条边和边界的相交点，找出在这些交点处的法线量
                 for (int j = 0; j < 12; j++)
                 {
-                    if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
+                    //check whether an edge have a point
+                    if ((EdgeFlag & (1 << j)) != 0) 
                     {
+                        //compute t values from two end points on each edge
                         float Offset = GetOffset(cubeValues[i * 8 + EdgeConnection[j, 0]], cubeValues[i * 8 + EdgeConnection[j, 1]], isoValue);//获得所在边的点的位置的系数
                         Point3d pt = new Point3d();
-                        //获取边上顶点的坐标
+                        //get positions
                         pt.X = index3d_voxelActive[i].x + (Vertices[EdgeConnection[j, 0], 0] + Offset * EdgeDirection[j, 0]) * scale;
                         pt.Y = index3d_voxelActive[i].y + (Vertices[EdgeConnection[j, 0], 1] + Offset * EdgeDirection[j, 1]) * scale;
                         pt.Z = index3d_voxelActive[i].z + (Vertices[EdgeConnection[j, 0], 2] + Offset * EdgeDirection[j, 2]) * scale;
@@ -475,7 +429,7 @@ namespace ALG_MarchingCubes
                 }
 
                 int num = 0;
-                //画出找到的三角形
+                //Find out points from each triangle
                 for (int Triangle = 0; Triangle < 5; Triangle++)
                 {
                     if (Tables.TriangleConnectionTable[flag, 3 * Triangle] < 0)
@@ -493,6 +447,7 @@ namespace ALG_MarchingCubes
             });
             return Apts.ToList() ;
         }
+        //extract isosurface points using GPU
         public List<Point3d> runExtractIsoSurfaceGPU()
         {
             var gpu = Gpu.Default;
@@ -520,7 +475,7 @@ namespace ALG_MarchingCubes
 
             gpu.For(0, num_voxelActive, i =>
              {
-                 //判定顶点状态，与用户指定的iso值比对
+                 //Compute cubeValues of 8 vertices
                  d_cubeValues[i * 8] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8]) * d_numbers[1];
                  d_cubeValues[i * 8 + 1] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 1]) * d_numbers[1];
                  d_cubeValues[i * 8 + 2] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 2]) * d_numbers[1];
@@ -530,6 +485,7 @@ namespace ALG_MarchingCubes
                  d_cubeValues[i * 8 + 6] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 6]) * d_numbers[1];
                  d_cubeValues[i * 8 + 7] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 7]) * d_numbers[1];
 
+                 //Check each vertex state
                  int flag = Compact(d_cubeValues[i * 8], d_numbers[0]);
                  flag += Compact(d_cubeValues[i * 8 + 1], d_numbers[0]) * 2;
                  flag += Compact(d_cubeValues[i * 8 + 2], d_numbers[0]) * 4;
@@ -539,26 +495,28 @@ namespace ALG_MarchingCubes
                  flag += Compact(d_cubeValues[i * 8 + 6], d_numbers[0]) * 64;
                  flag += Compact(d_cubeValues[i * 8 + 7], d_numbers[0]) * 128;
 
-                 //找到哪些几条边和边界相交
+                 //find out which edge intersects the isosurface
                  int EdgeFlag = d_EdgeTable[flag];
 
-                 //找出每条边和边界的相交点，找出在这些交点处的法线量
+                 //check whether this voxel is crossed by the isosurface
                  for (int j = 0; j < 12; j++)
                  {
-                     if ((EdgeFlag & (1 << j)) != 0) //如果在这条边上有交点
+                     //check whether an edge have a point
+                     if ((EdgeFlag & (1 << j)) != 0) 
                     {
+                         //compute t values from two end points on each edge
                          float Offset = GetOffset(d_cubeValues[i * 8 + d_EdgeConnection[j, 0]], d_cubeValues[i * 8 + d_EdgeConnection[j, 1]], d_numbers[0]);//获得所在边的点的位置的系数
                          float3 pt = new float3();
-                        //获取边上顶点的坐标
-                        pt.x = d_index3d_voxelActive[i].x + (d_Vertices[d_EdgeConnection[j, 0], 0] + Offset * d_EdgeDirection[j, 0]) * d_numbers[1];
+                         //get positions
+                         pt.x = d_index3d_voxelActive[i].x + (d_Vertices[d_EdgeConnection[j, 0], 0] + Offset * d_EdgeDirection[j, 0]) * d_numbers[1];
                          pt.y = d_index3d_voxelActive[i].y + (d_Vertices[d_EdgeConnection[j, 0], 1] + Offset * d_EdgeDirection[j, 1]) * d_numbers[1];
                          pt.z = d_index3d_voxelActive[i].z + (d_Vertices[d_EdgeConnection[j, 0], 2] + Offset * d_EdgeDirection[j, 2]) * d_numbers[1];
                          d_pts[12*i+j] = pt;
                      }
                  }
                  int num = 0;
-                //画出找到的三角形
-                for (int Triangle = 0; Triangle < 5; Triangle++)
+                 //Find out points from each triangle
+                 for (int Triangle = 0; Triangle < 5; Triangle++)
                  {
                      if (d_TriTable[flag, 3 * Triangle] < 0)
                          break;
