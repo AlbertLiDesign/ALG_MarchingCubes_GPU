@@ -128,9 +128,6 @@ namespace ALG_MarchingCubes
             double tc = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            //GH_Mesh ghm = new GH_Mesh(mesh);
-            //IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.targetBox, MCgpu.sourceBox, ghm);
-            //GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
             mesh.Vertices.CombineIdentical(true, true);
             mesh.Vertices.CullUnused();

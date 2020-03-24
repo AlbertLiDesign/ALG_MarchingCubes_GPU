@@ -21,6 +21,9 @@ namespace ALG_MarchingCubes
 {
     public class MarchingCubes_GPU
     {
+        private static readonly GlobalArraySymbol<int> verticesTable = Gpu.DefineConstantArraySymbol<int>(256);
+        private static readonly GlobalArraySymbol<int> edgeTable = Gpu.DefineConstantArraySymbol<int>(Tables.EdgeTable.Length);
+        private static readonly GlobalArraySymbol<int> triangleTable = Gpu.DefineConstantArraySymbol<int>(256*16);
 
         public Point3d basePoint;
         // boxs for mapping
@@ -201,7 +204,7 @@ namespace ALG_MarchingCubes
         }
         #endregion
         public void classifyVoxel(float3[] voxelV, int[] voxelVerts, int[] voxelOccupied, int3 gridSize,
-            int numVoxels, float3 voxelSize, float isoValue,float scale, float3[] samplePts,int[] VertsTable, int3[] gridIdx)
+            int numVoxels, float3 voxelSize, float isoValue,float scale, float3[] samplePts, int3[] gridIdx)
         {
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
@@ -247,7 +250,7 @@ namespace ALG_MarchingCubes
             cubeindex += Compact(d7, isoValue) * 128;
 
             //根据表来查出该体素的顶点数
-            int numVerts = VertsTable[cubeindex];
+            int numVerts = verticesTable[cubeindex];
             if (i < numVoxels)
             {
                 voxelVerts[i] = numVerts;
@@ -282,10 +285,11 @@ namespace ALG_MarchingCubes
             float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8);
             float3[] d_samplePts = gpu.Allocate<float3>(samplePts);
             int3[] d_gridIdx = gpu.Allocate<int3>(numVoxels);
-            int[] d_VertsTable = gpu.Allocate<int>(Tables.VertsTable);
+            gpu.Copy(Tables.VertsTable, verticesTable);
+            
 
             gpu.Launch(classifyVoxel, lp,d_voxelV, d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue,scale, d_samplePts, d_VertsTable, d_gridIdx);
+                gridSize, numVoxels, voxelSize, isoValue,scale, d_samplePts, d_gridIdx);
             
             //所有单元
             result_voxelV = Gpu.CopyToHost(d_voxelV);
@@ -300,7 +304,6 @@ namespace ALG_MarchingCubes
             Gpu.Free(d_voxelVerts);
             Gpu.Free(d_voxelOccupied);
             Gpu.Free(d_samplePts);
-            Gpu.Free(d_VertsTable);
             Gpu.Free(d_gridIdx);
 
             gpu.Synchronize();
@@ -472,8 +475,8 @@ namespace ALG_MarchingCubes
             float[,] d_Vertices = Gpu.Default.Allocate<float>(Vertices);
             float[,] d_EdgeDirection = Gpu.Default.Allocate<float>(EdgeDirection);
             int[,] d_EdgeConnection = Gpu.Default.Allocate<int>(EdgeConnection);
-            int[,] d_TriTable = Gpu.Default.Allocate<int>(Tables.TriangleTable);
-            int[] d_EdgeTable = Gpu.Default.Allocate<int>(Tables.EdgeTable);
+            gpu.Copy(Tables.EdgeTable, edgeTable);
+            gpu.Copy(Tables.TriangleTable_GPU,triangleTable);
 
             float[] numbers = new float[2];
             numbers[0] = isoValue;
@@ -503,7 +506,7 @@ namespace ALG_MarchingCubes
                  flag += Compact(d_cubeValues[i * 8 + 7], d_numbers[0]) * 128;
 
                  //find out which edge intersects the isosurface
-                 int EdgeFlag = d_EdgeTable[flag];
+                 int EdgeFlag = edgeTable[flag];
 
                  //check whether this voxel is crossed by the isosurface
                  for (int j = 0; j < 12; j++)
@@ -525,12 +528,12 @@ namespace ALG_MarchingCubes
                  //Find out points from each triangle
                  for (int Triangle = 0; Triangle < 5; Triangle++)
                  {
-                     if (d_TriTable[flag, 3 * Triangle] < 0)
+                     if (triangleTable[flag*16+ 3 * Triangle] < 0)
                          break;
 
                      for (int Corner = 0; Corner < 3; Corner++)
                      { 
-                         int Vertex = d_TriTable[flag, 3 * Triangle + Corner];
+                         int Vertex = triangleTable[flag*16+ 3 * Triangle + Corner];
                          float3 pd = CreateFloat3(d_baseP[0].x+d_pts[12*i+Vertex].x, d_baseP[0].y + d_pts[12 * i + Vertex].y, d_baseP[0].z + d_pts[12 * i + Vertex].z);
                          Apts[d_verts_scanIdx[i] + num] = pd;
                          num++;
