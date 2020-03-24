@@ -25,14 +25,12 @@ namespace ALG_MarchingCubes
         private static readonly GlobalArraySymbol<int> edgeTable = Gpu.DefineConstantArraySymbol<int>(Tables.EdgeTable.Length);
         private static readonly GlobalArraySymbol<int> triangleTable = Gpu.DefineConstantArraySymbol<int>(256*16);
 
-        public Point3d basePoint;
-        // boxs for mapping
+        // boudingbox of input parameters
         public Box sourceBox;
-        public Box targetBox;
+        public Point3d basePoint;
 
         // constants
-        public  int numVoxels = 0;
-
+        public int numVoxels = 0;
         public float3 voxelSize;
         public float isoValue;
 
@@ -40,7 +38,7 @@ namespace ALG_MarchingCubes
         public int[,] gridIndex3d;
 
         // sample points
-        float3[] samplePts;
+        private float3[] samplePts;
         public Point3d[] samplePoints;
 
         // the index of voxel in the grid
@@ -67,12 +65,11 @@ namespace ALG_MarchingCubes
         public int[] voxelOccupied;
 
         public MarchingCubes_GPU() { }
-        public MarchingCubes_GPU(Point3d basePoint, Box sourceBox, Box targetBox, int3 gridSize, float3 voxelSize,
+        public MarchingCubes_GPU(Point3d basePoint, Box sourceBox, int3 gridSize, float3 voxelSize,
             float scale, float isoValue,Point3d[] samplePoints)
         {
             this.basePoint = basePoint;
             this.sourceBox = sourceBox;
-            this.targetBox = targetBox;
             this.gridSize = gridSize;
             this.voxelSize = voxelSize;
             this.numVoxels = this.gridSize.x * this.gridSize.y * this.gridSize.z;
@@ -203,93 +200,79 @@ namespace ALG_MarchingCubes
             return (ValueDesired - Value1) / (Value2 - Value1);
         }
         #endregion
-        public void classifyVoxel(float3[] voxelV, int[] voxelVerts, int[] voxelOccupied, int3 gridSize,
-            int numVoxels, float3 voxelSize, float isoValue,float scale, float3[] samplePts, int3[] gridIdx)
-        {
-            int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
-            int i = blockId * blockDim.x + threadIdx.x; //线程索引
-
-            //计算grid中的位置
-            int3 gridPos = calcGridPos(i, gridSize);
-            gridIdx[i] = gridPos;
-            float3 p = new float3();
-
-            p.x = gridPos.x * voxelSize.x * scale;
-            p.y = gridPos.y * voxelSize.y * scale;
-            p.z = gridPos.z * voxelSize.z * scale;
-
-            //输出所有顶点
-            voxelV[i*8] = p;
-            voxelV[i*8+1] = CreateFloat3(voxelSize.x + p.x, 0 + p.y, 0 + p.z);
-            voxelV[i*8+2] = CreateFloat3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+3] = CreateFloat3(0 + p.x, voxelSize.y + p.y, 0 + p.z);
-            voxelV[i*8+4] = CreateFloat3(0 + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+5] = CreateFloat3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z);
-            voxelV[i*8+6] = CreateFloat3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-            voxelV[i*8+7] = CreateFloat3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-
-            //计算cube中的8个点对应的value
-            float d0 = ComputeValue(samplePts, voxelV[i * 8]);
-            float d1 = ComputeValue(samplePts, voxelV[i * 8 + 1]);
-            float d2 = ComputeValue(samplePts, voxelV[i * 8 + 2]);
-            float d3 = ComputeValue(samplePts, voxelV[i * 8 + 3]);
-            float d4 = ComputeValue(samplePts, voxelV[i * 8 + 4]);
-            float d5 = ComputeValue(samplePts, voxelV[i * 8 + 5]);
-            float d6 = ComputeValue(samplePts, voxelV[i * 8 + 6]);
-            float d7 = ComputeValue(samplePts, voxelV[i * 8 + 7]);
-
-            //判定它们的状态
-            int cubeindex;
-            cubeindex = Compact(d0, isoValue);
-            cubeindex += Compact(d1, isoValue) * 2;
-            cubeindex += Compact(d2, isoValue) * 4;
-            cubeindex += Compact(d3, isoValue) * 8;
-            cubeindex += Compact(d4, isoValue) * 16;
-            cubeindex += Compact(d5, isoValue) * 32;
-            cubeindex += Compact(d6, isoValue) * 64;
-            cubeindex += Compact(d7, isoValue) * 128;
-
-            //根据表来查出该体素的顶点数
-            int numVerts = verticesTable[cubeindex];
-            if (i < numVoxels)
-            {
-                voxelVerts[i] = numVerts;
-                if (numVerts > 0)
-                {
-                    voxelOccupied[i] = 1;
-                }
-            }
-        }
-
         //classify all voxels according to their activity
+        [GpuManaged]
         public void runClassifyVoxel()
         { 
-            //多kernel的通用线程管理
-            int threads = 128;
-            Alea.dim3 grid = new Alea.dim3((numVoxels + threads - 1) / threads, 1, 1); //block的数量，维度
-            Alea.dim3 block = new Alea.dim3(threads, 1, 1); //thread的数量，维度
-
-            if (grid.x > 65535)
-            {
-                grid.y = grid.x / 32768;
-                grid.x = 32768;
-            }
-
             var gpu = Gpu.Default;
-            var lp = new LaunchParam(grid, block);
 
             samplePts = ConvertPointsToFloat3(samplePoints);
 
             int[] d_voxelVerts = gpu.Allocate<int>(numVoxels);
             int[] d_voxelOccupied = gpu.Allocate<int>(numVoxels);
-            float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8);
+            float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8); 
             float3[] d_samplePts = gpu.Allocate<float3>(samplePts);
             int3[] d_gridIdx = gpu.Allocate<int3>(numVoxels);
             gpu.Copy(Tables.VertsTable, verticesTable);
-            
 
-            gpu.Launch(classifyVoxel, lp,d_voxelV, d_voxelVerts, d_voxelOccupied,
-                gridSize, numVoxels, voxelSize, isoValue,scale, d_samplePts, d_gridIdx);
+            float3[] floatV = new float3[2] { new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z), voxelSize };
+            float3[] d_floatV = Gpu.Default.Allocate<float3>(floatV);
+            int3[] gridSizeC = new int3[1] { gridSize };
+            int3[] d_gridSize = Gpu.Default.Allocate<int3>(gridSizeC);
+            float[] numbers = new float[2] { isoValue, scale };
+            float[] d_numbers = Gpu.Default.Allocate<float>(numbers);
+
+            gpu.For(0, numVoxels, i =>
+             {
+                 //计算grid中的位置
+                 int3 gridPos = calcGridPos(i, d_gridSize[0]);
+                 d_gridIdx[i] = gridPos;
+                 float3 p = new float3();
+
+                 p.x = d_floatV[0].x + gridPos.x * d_floatV[1].x * d_numbers[1];
+                 p.y = d_floatV[0].y + gridPos.y * d_floatV[1].y * d_numbers[1];
+                 p.z = d_floatV[0].z + gridPos.z * d_floatV[1].z * d_numbers[1];
+
+                 //输出所有顶点
+                 d_voxelV[i * 8] = p;
+                 d_voxelV[i * 8 + 1] = CreateFloat3(d_floatV[1].x + p.x, 0 + p.y, 0 + p.z);
+                 d_voxelV[i * 8 + 2] = CreateFloat3(d_floatV[1].x + p.x, d_floatV[1].y + p.y, 0 + p.z);
+                 d_voxelV[i * 8 + 3] = CreateFloat3(0 + p.x, d_floatV[1].y + p.y, 0 + p.z);
+                 d_voxelV[i * 8 + 4] = CreateFloat3(0 + p.x, 0 + p.y, d_floatV[1].z + p.z);
+                 d_voxelV[i * 8 + 5] = CreateFloat3(d_floatV[1].x + p.x, 0 + p.y, d_floatV[1].z + p.z);
+                 d_voxelV[i * 8 + 6] = CreateFloat3(d_floatV[1].x + p.x, d_floatV[1].y + p.y, d_floatV[1].z + p.z);
+                 d_voxelV[i * 8 + 7] = CreateFloat3(0 + p.x, d_floatV[1].y + p.y, d_floatV[1].z + p.z);
+
+                 //计算cube中的8个点对应的value
+                 float d0 = ComputeValue(d_samplePts, d_voxelV[i * 8]);
+                 float d1 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 1]);
+                 float d2 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 2]);
+                 float d3 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 3]);
+                 float d4 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 4]);
+                 float d5 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 5]);
+                 float d6 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 6]);
+                 float d7 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 7]);
+
+                 //判定它们的状态
+                 int cubeindex;
+                 cubeindex = Compact(d0, d_numbers[0]);
+                 cubeindex += Compact(d1, d_numbers[0]) * 2;
+                 cubeindex += Compact(d2, d_numbers[0]) * 4;
+                 cubeindex += Compact(d3, d_numbers[0]) * 8;
+                 cubeindex += Compact(d4, d_numbers[0]) * 16;
+                 cubeindex += Compact(d5, d_numbers[0]) * 32;
+                 cubeindex += Compact(d6, d_numbers[0]) * 64;
+                 cubeindex += Compact(d7, d_numbers[0]) * 128;
+
+                //根据表来查出该体素的顶点数
+                int numVerts = verticesTable[cubeindex];
+
+                 d_voxelVerts[i] = numVerts;
+                 if (numVerts > 0)
+                 {
+                     d_voxelOccupied[i] = 1;
+                 }
+             });
             
             //所有单元
             result_voxelV = Gpu.CopyToHost(d_voxelV);
@@ -309,6 +292,7 @@ namespace ALG_MarchingCubes
             gpu.Synchronize();
         }
         //reduce empty voxel and extract active voxels
+        [GpuManaged]
         public void runExtractActiveVoxels()
         {
             var gpu = Gpu.Default;
@@ -386,6 +370,7 @@ namespace ALG_MarchingCubes
             gpu.Synchronize(); 
         }
         //extract isosurface points using CPU
+        [GpuManaged]
         public List<Point3d> runExtractIsoSurfaceCPU()
         {
             cubeValues = new float[8 * num_voxelActive];
@@ -468,20 +453,17 @@ namespace ALG_MarchingCubes
             float[] d_cubeValues = Gpu.Default.Allocate<float>(8 * num_voxelActive);
             int[] d_verts_scanIdx = Gpu.Default.Allocate<int>(verts_scanIdx);
 
-            float3[] baseP = new float3[1];
-            baseP[0] = new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z);
-            float3[] d_baseP = Gpu.Default.Allocate<float3>(baseP);
-
             float[,] d_Vertices = Gpu.Default.Allocate<float>(Vertices);
             float[,] d_EdgeDirection = Gpu.Default.Allocate<float>(EdgeDirection);
             int[,] d_EdgeConnection = Gpu.Default.Allocate<int>(EdgeConnection);
             gpu.Copy(Tables.EdgeTable, edgeTable);
             gpu.Copy(Tables.TriangleTable_GPU,triangleTable);
 
-            float[] numbers = new float[2];
-            numbers[0] = isoValue;
-            numbers[1] = scale;
+            float[] numbers = new float[2] { isoValue, scale };
             float[] d_numbers = Gpu.Default.Allocate<float>(numbers);
+
+            float3[] floatV = new float3[1] { new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z)};
+            float3[] d_floatV = Gpu.Default.Allocate<float3>(floatV);
 
             gpu.For(0, num_voxelActive, i =>
              {
@@ -518,9 +500,9 @@ namespace ALG_MarchingCubes
                          float Offset = GetOffset(d_cubeValues[i * 8 + d_EdgeConnection[j, 0]], d_cubeValues[i * 8 + d_EdgeConnection[j, 1]], d_numbers[0]);//获得所在边的点的位置的系数
                          float3 pt = new float3();
                          //get positions
-                         pt.x = d_index3d_voxelActive[i].x + (d_Vertices[d_EdgeConnection[j, 0], 0] + Offset * d_EdgeDirection[j, 0]) * d_numbers[1];
-                         pt.y = d_index3d_voxelActive[i].y + (d_Vertices[d_EdgeConnection[j, 0], 1] + Offset * d_EdgeDirection[j, 1]) * d_numbers[1];
-                         pt.z = d_index3d_voxelActive[i].z + (d_Vertices[d_EdgeConnection[j, 0], 2] + Offset * d_EdgeDirection[j, 2]) * d_numbers[1];
+                         pt.x = d_floatV[0].x+d_index3d_voxelActive[i].x + (d_Vertices[d_EdgeConnection[j, 0], 0] + Offset * d_EdgeDirection[j, 0]) * d_numbers[1];
+                         pt.y = d_floatV[0].y+d_index3d_voxelActive[i].y + (d_Vertices[d_EdgeConnection[j, 0], 1] + Offset * d_EdgeDirection[j, 1]) * d_numbers[1];
+                         pt.z = d_floatV[0].z+d_index3d_voxelActive[i].z + (d_Vertices[d_EdgeConnection[j, 0], 2] + Offset * d_EdgeDirection[j, 2]) * d_numbers[1];
                          d_pts[12*i+j] = pt;
                      }
                  }
@@ -534,7 +516,7 @@ namespace ALG_MarchingCubes
                      for (int Corner = 0; Corner < 3; Corner++)
                      { 
                          int Vertex = triangleTable[flag*16+ 3 * Triangle + Corner];
-                         float3 pd = CreateFloat3(d_baseP[0].x+d_pts[12*i+Vertex].x, d_baseP[0].y + d_pts[12 * i + Vertex].y, d_baseP[0].z + d_pts[12 * i + Vertex].z);
+                         float3 pd = CreateFloat3(d_pts[12*i+Vertex].x,d_pts[12 * i + Vertex].y, d_pts[12 * i + Vertex].z);
                          Apts[d_verts_scanIdx[i] + num] = pd;
                          num++;
                      }

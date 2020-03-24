@@ -64,10 +64,6 @@ namespace ALG_MarchingCubes
             int yCount = (int)Math.Abs(Math.Round((yD.T1 - yD.T0), MidpointRounding.AwayFromZero));
             int zCount = (int)Math.Abs(Math.Round((zD.T1 - zD.T0), MidpointRounding.AwayFromZero));
 
-            Interval intervalX = new Interval(0, xD.Length);
-            Interval intervalY = new Interval(0, yD.Length);
-            Interval intervalZ = new Interval(0, zD.Length);
-
             Point3d[] a = box1.GetCorners();
             List<double> b = new List<double>();
             for (int i = 0; i < 8; i++)
@@ -77,17 +73,7 @@ namespace ALG_MarchingCubes
             }
             Point3d baseP = a[b.IndexOf(b.Min())];
 
-            //建立映射目标box
-            Box box2 = new Box(plane, intervalX, intervalY, intervalZ);
-
-            //开始映射
-            for (int i = 0; i < geos.Count; i++)
-            {
-                new_geos.Add(BasicFunctions.BoxTrans(box1, box2, geos[i]));
-            }
-
-            //转换几何数据为点数据
-            samplePoints = BasicFunctions.ConvertGeosToPoints(new_geos);
+            samplePoints = BasicFunctions.ConvertGeosToPoints(geos);
 
             Alea.int3 gridS = new Alea.int3();
             gridS.x = xCount;
@@ -99,8 +85,7 @@ namespace ALG_MarchingCubes
             voxelS.y = (float)scale;
             voxelS.z = (float)scale;
 
-            
-            var MCgpu = new MarchingCubes_GPU(baseP, box1, box2, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
+            var MCgpu = new MarchingCubes_GPU(baseP, box1, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
             #endregion
 
             #region 分类体素、扫描体素
@@ -144,7 +129,6 @@ namespace ALG_MarchingCubes
             time.Add(tc);
             time.Add(td);
             
-
             DA.SetDataList("Time", time);
             DA.SetData("Mesh", mesh);
             #endregion
