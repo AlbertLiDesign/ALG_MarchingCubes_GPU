@@ -12,6 +12,25 @@ namespace ALG_MarchingCubes
 {
     public class BasicFunctions
     {
+        public static List<Line> GetBoundingBoxBoundaries(Box box)
+        {
+            List<Line> lines = new List<Line>();
+            Point3d[] corners = box.GetCorners();
+
+            lines.Add(new Line(corners[0], corners[1]));
+            lines.Add(new Line(corners[1], corners[2]));
+            lines.Add(new Line(corners[2], corners[3]));
+            lines.Add(new Line(corners[3], corners[0]));
+            lines.Add(new Line(corners[4], corners[0]));
+            lines.Add(new Line(corners[5], corners[1]));
+            lines.Add(new Line(corners[6], corners[2]));
+            lines.Add(new Line(corners[7], corners[3]));
+            lines.Add(new Line(corners[4], corners[5]));
+            lines.Add(new Line(corners[5], corners[6]));
+            lines.Add(new Line(corners[6], corners[7]));
+            lines.Add(new Line(corners[7], corners[4]));
+            return lines;
+        }
         //构建用于映射的Box
         public static Box CreateUnionBBoxFromGeometry(List<IGH_GeometricGoo> geos, double scale)
         {
@@ -110,10 +129,10 @@ namespace ALG_MarchingCubes
             int FCount = pts.Count / 3;
             for (int i = 0; i < FCount; i++)
             {
-                mesh.Vertices.Add(pts[i * 3]);
-                mesh.Vertices.Add(pts[i * 3 + 1]);
-                mesh.Vertices.Add(pts[i * 3 + 2]);
-                mesh.Faces.AddFace(i * 3, i * 3 + 1, i * 3 + 2);
+                Point3d[] vertices = new Point3d[3] { pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2] };
+                MeshFace mf = new MeshFace(i * 3, i * 3 + 1, i * 3 + 2);
+                mesh.Vertices.AddVertices(vertices);
+                mesh.Faces.AddFace(mf);
             }
             return mesh;
         }

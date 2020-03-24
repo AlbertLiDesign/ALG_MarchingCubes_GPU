@@ -63,6 +63,12 @@
       <HintPath>..\Coding\Ameba\AmebaMesh\dll\Sr7\Grasshopper.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Plankton">
+      <HintPath>C:\Users\alber\AppData\Roaming\Grasshopper\6\Libraries\Plankton.dll</HintPath>
+    </Reference>
+    <Reference Include="PlanktonGh">
+      <HintPath>C:\Users\alber\AppData\Roaming\Grasshopper\6\Libraries\PlanktonGh.dll</HintPath>
+    </Reference>
     <Reference Include="RhinoCommon">
       <HintPath>..\Coding\Ameba\AmebaMesh\dll\Sr7\RhinoCommon.dll</HintPath>
       <Private>False</Private>
@@ -80,8 +86,11 @@
   <ItemGroup>
     <Compile Include="ALG_MarchingCubes.cs" />
     <Compile Include="BasicFunctions.cs" />
+    <Compile Include="ComputeVoxels.cs" />
+    <Compile Include="ExtractIsoSurface.cs" />
     <Compile Include="MarchingCubes_GPU.cs" />
     <Compile Include="MarchingCubes_CPU.cs" />
+    <Compile Include="MeshChecker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tables.cs" />
   </ItemGroup>

@@ -11,24 +11,24 @@ using System.Linq;
 
 namespace ALG_MarchingCubes
 {
-    public class ALG_MC : GH_Component
+    public class ALG_ComputeVoxels : GH_Component
     {
-        public ALG_MC()
-          : base("MarchingCubes(ALG)", "ALG_MC", "Create mesh pipes from lines.", "ALG", "MarchingCubes") { }
+        public ALG_ComputeVoxels()
+          : base("ComputeVoxels", "ComputeVoxels", "Compute voxels from points.", "ALG", "MarchingCubes") { }
         public override GH_Exposure Exposure => GH_Exposure.primary;
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddGeometryParameter("Geometries", "G", "Geometries", GH_ParamAccess.list);
-            pManager.AddNumberParameter("BoundaryRatio", "B", "BoundaryRatio", GH_ParamAccess.item,2);
+            pManager.AddNumberParameter("BoundaryRatio", "B", "BoundaryRatio", GH_ParamAccess.item, 2);
             pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item, 1);
-            pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item,5.0);
-            pManager.AddBooleanParameter("GPU", "GPU", "GPU", GH_ParamAccess.item,true);
+            pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item, 5.0);
         }
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("Mesh", "M", "Mesh", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Time", "", "", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Boundary", "B", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
+            pManager.AddGenericParameter("Voxel", "V", "Voxel", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -91,53 +91,30 @@ namespace ALG_MarchingCubes
             Stopwatch sw = new Stopwatch();
             sw.Start();
             MCgpu.runClassifyVoxel();
-            MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double ta = sw.Elapsed.TotalMilliseconds;
-            #endregion
 
-            #region 提取Isosurface点集
             sw.Restart();
-            List<Point3d> resultPts = new List<Point3d>();
-            resultPts = MCgpu.runExtractIsoSurfaceGPU();
-            //resultPts = MCgpu.runExtractIsoSurfaceCPU();
+            MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
             #endregion
 
-            #region 提取网格、检查网格
-            sw.Restart();
-            Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
-            sw.Stop();
-            double tc = sw.Elapsed.TotalMilliseconds;
-
-            sw.Restart();
-
-            mesh.Vertices.CombineIdentical(true, true);
-            mesh.Vertices.CullUnused();
-            mesh.Weld(3.1415926535897931);
-            mesh.FaceNormals.ComputeFaceNormals();
-            mesh.Normals.ComputeNormals();
-            sw.Stop();
-            double td = sw.Elapsed.TotalMilliseconds;
-            #endregion
             this.Message = MCgpu.numVoxels.ToString();
-            
-
             #region 计算运行时间、输出数据
             time.Add(ta);
             time.Add(tb);
-            time.Add(tc);
-            time.Add(td);
-            
+            List<Line> boundaries = BasicFunctions.GetBoundingBoxBoundaries(MCgpu.sourceBox);
+            DA.SetDataList("Boundary", boundaries);
+            DA.SetData("Voxel", MCgpu);
             DA.SetDataList("Time", time);
-            DA.SetData("Mesh", mesh);
             #endregion
         }
+
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
         {
-            get { return new Guid("{F4D2FDE0-365A-46B5-9AC3-3A4939D5E61A}"); }
+            get { return new Guid("{0B62C19C-90C5-4C8F-91E4-D0D77AF21596}"); }
         }
     }
 }

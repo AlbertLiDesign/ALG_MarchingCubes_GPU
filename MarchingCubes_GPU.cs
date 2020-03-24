@@ -221,6 +221,7 @@ namespace ALG_MarchingCubes
             int3[] d_gridSize = Gpu.Default.Allocate<int3>(gridSizeC);
             float[] numbers = new float[2] { isoValue, scale };
             float[] d_numbers = Gpu.Default.Allocate<float>(numbers);
+            gpu.Synchronize();
 
             gpu.For(0, numVoxels, i =>
              {
@@ -232,6 +233,7 @@ namespace ALG_MarchingCubes
                  p.x = d_floatV[0].x + gridPos.x * d_floatV[1].x * d_numbers[1];
                  p.y = d_floatV[0].y + gridPos.y * d_floatV[1].y * d_numbers[1];
                  p.z = d_floatV[0].z + gridPos.z * d_floatV[1].z * d_numbers[1];
+                 DeviceFunction.SyncThreads();
 
                  //输出所有顶点
                  d_voxelV[i * 8] = p;
@@ -242,6 +244,7 @@ namespace ALG_MarchingCubes
                  d_voxelV[i * 8 + 5] = CreateFloat3(d_floatV[1].x + p.x, 0 + p.y, d_floatV[1].z + p.z);
                  d_voxelV[i * 8 + 6] = CreateFloat3(d_floatV[1].x + p.x, d_floatV[1].y + p.y, d_floatV[1].z + p.z);
                  d_voxelV[i * 8 + 7] = CreateFloat3(0 + p.x, d_floatV[1].y + p.y, d_floatV[1].z + p.z);
+                 DeviceFunction.SyncThreads();
 
                  //计算cube中的8个点对应的value
                  float d0 = ComputeValue(d_samplePts, d_voxelV[i * 8]);
@@ -252,6 +255,7 @@ namespace ALG_MarchingCubes
                  float d5 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 5]);
                  float d6 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 6]);
                  float d7 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 7]);
+                 DeviceFunction.SyncThreads();
 
                  //判定它们的状态
                  int cubeindex;
@@ -263,15 +267,16 @@ namespace ALG_MarchingCubes
                  cubeindex += Compact(d5, d_numbers[0]) * 32;
                  cubeindex += Compact(d6, d_numbers[0]) * 64;
                  cubeindex += Compact(d7, d_numbers[0]) * 128;
-
-                //根据表来查出该体素的顶点数
-                int numVerts = verticesTable[cubeindex];
+                 DeviceFunction.SyncThreads();
+                 //根据表来查出该体素的顶点数
+                 int numVerts = verticesTable[cubeindex];
 
                  d_voxelVerts[i] = numVerts;
                  if (numVerts > 0)
                  {
                      d_voxelOccupied[i] = 1;
                  }
+                 DeviceFunction.SyncThreads();
              });
             
             //所有单元
@@ -465,6 +470,8 @@ namespace ALG_MarchingCubes
             float3[] floatV = new float3[1] { new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z)};
             float3[] d_floatV = Gpu.Default.Allocate<float3>(floatV);
 
+            gpu.Synchronize();
+
             gpu.For(0, num_voxelActive, i =>
              {
                  //Compute cubeValues of 8 vertices
@@ -476,6 +483,7 @@ namespace ALG_MarchingCubes
                  d_cubeValues[i * 8 + 5] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 5]) * d_numbers[1];
                  d_cubeValues[i * 8 + 6] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 6]) * d_numbers[1];
                  d_cubeValues[i * 8 + 7] = ComputeValue(d_samplePts, d_model_voxelActive[i * 8 + 7]) * d_numbers[1];
+                 DeviceFunction.SyncThreads();
 
                  //Check each vertex state
                  int flag = Compact(d_cubeValues[i * 8], d_numbers[0]);
@@ -486,9 +494,11 @@ namespace ALG_MarchingCubes
                  flag += Compact(d_cubeValues[i * 8 + 5], d_numbers[0]) * 32;
                  flag += Compact(d_cubeValues[i * 8 + 6], d_numbers[0]) * 64;
                  flag += Compact(d_cubeValues[i * 8 + 7], d_numbers[0]) * 128;
+                 DeviceFunction.SyncThreads();
 
                  //find out which edge intersects the isosurface
                  int EdgeFlag = edgeTable[flag];
+                 DeviceFunction.SyncThreads();
 
                  //check whether this voxel is crossed by the isosurface
                  for (int j = 0; j < 12; j++)
@@ -504,8 +514,10 @@ namespace ALG_MarchingCubes
                          pt.y = d_floatV[0].y+d_index3d_voxelActive[i].y + (d_Vertices[d_EdgeConnection[j, 0], 1] + Offset * d_EdgeDirection[j, 1]) * d_numbers[1];
                          pt.z = d_floatV[0].z+d_index3d_voxelActive[i].z + (d_Vertices[d_EdgeConnection[j, 0], 2] + Offset * d_EdgeDirection[j, 2]) * d_numbers[1];
                          d_pts[12*i+j] = pt;
+                         
                      }
                  }
+                 DeviceFunction.SyncThreads();
                  int num = 0;
                  //Find out points from each triangle
                  for (int Triangle = 0; Triangle < 5; Triangle++)
@@ -519,9 +531,12 @@ namespace ALG_MarchingCubes
                          float3 pd = CreateFloat3(d_pts[12*i+Vertex].x,d_pts[12 * i + Vertex].y, d_pts[12 * i + Vertex].z);
                          Apts[d_verts_scanIdx[i] + num] = pd;
                          num++;
+                         
                      }
                  }
+                 DeviceFunction.SyncThreads();
              });
+            gpu.Synchronize();
             var result_Scan = Gpu.CopyToHost(Apts);
             return ConvertFloat3ToPoint3d(result_Scan);
         }
