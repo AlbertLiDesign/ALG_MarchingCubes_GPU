@@ -21,6 +21,8 @@ namespace ALG_MarchingCubes
 {
     public class MarchingCubes_GPU
     {
+
+        public Point3d basePoint;
         // boxs for mapping
         public Box sourceBox;
         public Box targetBox;
@@ -62,9 +64,10 @@ namespace ALG_MarchingCubes
         public int[] voxelOccupied;
 
         public MarchingCubes_GPU() { }
-        public MarchingCubes_GPU(Box sourceBox, Box targetBox, int3 gridSize, float3 voxelSize,
+        public MarchingCubes_GPU(Point3d basePoint, Box sourceBox, Box targetBox, int3 gridSize, float3 voxelSize,
             float scale, float isoValue,Point3d[] samplePoints)
         {
+            this.basePoint = basePoint;
             this.sourceBox = sourceBox;
             this.targetBox = targetBox;
             this.gridSize = gridSize;
@@ -410,7 +413,7 @@ namespace ALG_MarchingCubes
                 flag += Compact(cubeValues[i * 8 + 7], isoValue) * 128;
 
                 //find out which edge intersects the isosurface
-                int EdgeFlag = Tables.CubeEdgeFlags[flag];
+                int EdgeFlag = Tables.EdgeTable[flag];
 
                 for (int j = 0; j < 12; j++)
                 {
@@ -432,13 +435,13 @@ namespace ALG_MarchingCubes
                 //Find out points from each triangle
                 for (int Triangle = 0; Triangle < 5; Triangle++)
                 {
-                    if (Tables.TriangleConnectionTable[flag, 3 * Triangle] < 0)
+                    if (Tables.TriangleTable[flag, 3 * Triangle] < 0)
                         break;
 
 
                     for (int Corner = 0; Corner < 3; Corner++)
                     {
-                        int Vertex = Tables.TriangleConnectionTable[flag, 3 * Triangle + Corner];
+                        int Vertex = Tables.TriangleTable[flag, 3 * Triangle + Corner];
                         Point3d pd = new Point3d(pts[Vertex].X, pts[Vertex].Y, pts[Vertex].Z);
                         Apts[verts_scanIdx[i] + num] = pd;
                         num++;
@@ -462,11 +465,15 @@ namespace ALG_MarchingCubes
             float[] d_cubeValues = Gpu.Default.Allocate<float>(8 * num_voxelActive);
             int[] d_verts_scanIdx = Gpu.Default.Allocate<int>(verts_scanIdx);
 
+            float3[] baseP = new float3[1];
+            baseP[0] = new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z);
+            float3[] d_baseP = Gpu.Default.Allocate<float3>(baseP);
+
             float[,] d_Vertices = Gpu.Default.Allocate<float>(Vertices);
             float[,] d_EdgeDirection = Gpu.Default.Allocate<float>(EdgeDirection);
             int[,] d_EdgeConnection = Gpu.Default.Allocate<int>(EdgeConnection);
-            int[,] d_TriTable = Gpu.Default.Allocate<int>(Tables.TriangleConnectionTable);
-            int[] d_EdgeTable = Gpu.Default.Allocate<int>(Tables.CubeEdgeFlags);
+            int[,] d_TriTable = Gpu.Default.Allocate<int>(Tables.TriangleTable);
+            int[] d_EdgeTable = Gpu.Default.Allocate<int>(Tables.EdgeTable);
 
             float[] numbers = new float[2];
             numbers[0] = isoValue;
@@ -524,7 +531,7 @@ namespace ALG_MarchingCubes
                      for (int Corner = 0; Corner < 3; Corner++)
                      { 
                          int Vertex = d_TriTable[flag, 3 * Triangle + Corner];
-                         float3 pd = CreateFloat3(d_pts[12*i+Vertex].x, d_pts[12 * i + Vertex].y, d_pts[12 * i + Vertex].z);
+                         float3 pd = CreateFloat3(d_baseP[0].x+d_pts[12*i+Vertex].x, d_baseP[0].y + d_pts[12 * i + Vertex].y, d_baseP[0].z + d_pts[12 * i + Vertex].z);
                          Apts[d_verts_scanIdx[i] + num] = pd;
                          num++;
                      }

@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Diagnostics;
 using Grasshopper;
 using Grasshopper.Kernel.Data;
+using System.Linq;
 
 namespace ALG_MarchingCubes
 {
@@ -67,6 +68,15 @@ namespace ALG_MarchingCubes
             Interval intervalY = new Interval(0, yD.Length);
             Interval intervalZ = new Interval(0, zD.Length);
 
+            Point3d[] a = box1.GetCorners();
+            List<double> b = new List<double>();
+            for (int i = 0; i < 8; i++)
+            {
+                double t = a[i].X + a[i].Y + a[i].Z;
+                b.Add(t);
+            }
+            Point3d baseP = a[b.IndexOf(b.Min())];
+
             //建立映射目标box
             Box box2 = new Box(plane, intervalX, intervalY, intervalZ);
 
@@ -90,7 +100,7 @@ namespace ALG_MarchingCubes
             voxelS.z = (float)scale;
 
             
-            var MCgpu = new MarchingCubes_GPU(box1, box2, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
+            var MCgpu = new MarchingCubes_GPU(baseP, box1, box2, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
             #endregion
 
             #region 分类体素、扫描体素
@@ -118,9 +128,9 @@ namespace ALG_MarchingCubes
             double tc = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            GH_Mesh ghm = new GH_Mesh(mesh);
-            IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.targetBox, MCgpu.sourceBox, ghm);
-            GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
+            //GH_Mesh ghm = new GH_Mesh(mesh);
+            //IGH_GeometricGoo geoResult = BasicFunctions.BoxTrans(MCgpu.targetBox, MCgpu.sourceBox, ghm);
+            //GH_Convert.ToMesh(geoResult, ref mesh, GH_Conversion.Both);
 
             mesh.Vertices.CombineIdentical(true, true);
             mesh.Vertices.CullUnused();

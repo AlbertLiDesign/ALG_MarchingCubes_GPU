@@ -96,7 +96,7 @@ namespace ALG_MarchingCubes
                 }
             }
             //find out which edge intersects the isosurface
-            EdgeFlag = Tables.CubeEdgeFlags[flag];
+            EdgeFlag = Tables.EdgeTable[flag];
 
 
             //check whether this voxel is crossed by the isosurface
@@ -121,13 +121,13 @@ namespace ALG_MarchingCubes
             //Find out points from each triangle
             for (int Triangle = 0; Triangle < 5; Triangle++)
             {
-                if (Tables.TriangleConnectionTable[flag, 3 * Triangle] < 0)
+                if (Tables.TriangleTable[flag, 3 * Triangle] < 0)
                     break;
 
 
                 for (int Corner = 0; Corner < 3; Corner++)
                 {
-                    int Vertex = Tables.TriangleConnectionTable[flag, 3 * Triangle + Corner];
+                    int Vertex = Tables.TriangleTable[flag, 3 * Triangle + Corner];
                     Point3d pd = new Point3d(EdgeVertex[Vertex].X, EdgeVertex[Vertex].Y, EdgeVertex[Vertex].Z);
                     pts.Add(pd);
                 }
