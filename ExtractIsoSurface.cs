@@ -24,6 +24,7 @@ namespace ALG_MarchingCubes
         {
             pManager.AddMeshParameter("Mesh", "", "", GH_ParamAccess.list);
             pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddGenericParameter("Voxel", "V", "Voxel", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -65,6 +66,7 @@ namespace ALG_MarchingCubes
 
             DA.SetData("Mesh", mesh);
             DA.SetDataList("Time", time);
+            DA.SetData("Voxel", MCgpu);
         }
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid

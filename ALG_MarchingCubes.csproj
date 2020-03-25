@@ -84,7 +84,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ALG_MarchingCubes.cs" />
     <Compile Include="BasicFunctions.cs" />
     <Compile Include="ComputeVoxels.cs" />
     <Compile Include="ExtractIsoSurface.cs" />
@@ -93,6 +92,7 @@
     <Compile Include="MeshChecker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tables.cs" />
+    <Compile Include="TestComponent.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

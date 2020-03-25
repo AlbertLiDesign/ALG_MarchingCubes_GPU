@@ -28,20 +28,15 @@ namespace ALG_MarchingCubes
         {
             pManager.AddCurveParameter("Boundary", "B", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
             pManager.AddGenericParameter("Voxel", "V", "Voxel", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            #region 输入数据
+            #region input parameters
             List<IGH_GeometricGoo> geos = new List<IGH_GeometricGoo>();
-            List<IGH_GeometricGoo> new_geos = new List<IGH_GeometricGoo>();
-            List<double> Weights = new List<double>();
-            List<Point3d> samplePoints = new List<Point3d>();
             double scale = 1.0;
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
-            List<double> time = new List<double>();
 
             DA.GetDataList("Geometries", geos);
             DA.GetData("BoundaryRatio", ref boundaryRatio);
@@ -49,18 +44,16 @@ namespace ALG_MarchingCubes
             DA.GetData("isoValue", ref isovalue);
             #endregion
 
-            #region 初始化MC数据
-            //建立基box
+            #region initialization
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
 
-            //求三个方向上单元的数量
             Interval xD = box1.X;
             Interval yD = box1.Y;
             Interval zD = box1.Z;
 
-            int xCount = (int)Math.Abs(Math.Round((xD.T1 - xD.T0), MidpointRounding.AwayFromZero));
-            int yCount = (int)Math.Abs(Math.Round((yD.T1 - yD.T0), MidpointRounding.AwayFromZero));
-            int zCount = (int)Math.Abs(Math.Round((zD.T1 - zD.T0), MidpointRounding.AwayFromZero));
+            int xCount = (int)Math.Abs(Math.Round(((xD.T1 - xD.T0) / scale), MidpointRounding.AwayFromZero));
+            int yCount = (int)Math.Abs(Math.Round(((yD.T1 - yD.T0) / scale), MidpointRounding.AwayFromZero));
+            int zCount = (int)Math.Abs(Math.Round(((zD.T1 - zD.T0) / scale), MidpointRounding.AwayFromZero));
 
             Point3d[] a = box1.GetCorners();
             List<double> b = new List<double>();
@@ -71,42 +64,23 @@ namespace ALG_MarchingCubes
             }
             Point3d baseP = a[b.IndexOf(b.Min())];
 
-            samplePoints = BasicFunctions.ConvertGeosToPoints(geos);
-
-            Alea.int3 gridS = new Alea.int3();
-            gridS.x = xCount;
-            gridS.y = yCount;
-            gridS.z = zCount;
-
-            Alea.float3 voxelS = new Alea.float3();
-            voxelS.x = (float)scale;
-            voxelS.y = (float)scale;
-            voxelS.z = (float)scale;
+            List<Point3d> samplePoints = BasicFunctions.ConvertGeosToPoints(geos);
+            Alea.int3 gridS = new Alea.int3(xCount,yCount,zCount);
+            Alea.float3 voxelS = new Alea.float3((float)scale, (float)scale, (float)scale);
 
             var MCgpu = new MarchingCubes_GPU(baseP, box1, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
             #endregion
 
-            #region 分类体素、扫描体素
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
+            #region classify voxel and reduce data
             MCgpu.runClassifyVoxel();
-            sw.Stop();
-            double ta = sw.Elapsed.TotalMilliseconds;
-
-            sw.Restart();
             MCgpu.runExtractActiveVoxels();
-            sw.Stop();
-            double tb = sw.Elapsed.TotalMilliseconds;
             #endregion
 
             this.Message = MCgpu.numVoxels.ToString();
-            #region 计算运行时间、输出数据
-            time.Add(ta);
-            time.Add(tb);
+            #region output voxel data
             List<Line> boundaries = BasicFunctions.GetBoundingBoxBoundaries(MCgpu.sourceBox);
             DA.SetDataList("Boundary", boundaries);
             DA.SetData("Voxel", MCgpu);
-            DA.SetDataList("Time", time);
             #endregion
         }
 
