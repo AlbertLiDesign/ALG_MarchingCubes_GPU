@@ -246,7 +246,7 @@ namespace ALG_MarchingCubes
                  d_voxelV[i * 8 + 7] = CreateFloat3(0 + p.x, d_floatV[1].y + p.y, d_floatV[1].z + p.z);
                  DeviceFunction.SyncThreads();
 
-                 //计算cube中的8个点对应的value
+                 ////计算cube中的8个点对应的value
                  float d0 = ComputeValue(d_samplePts, d_voxelV[i * 8]);
                  float d1 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 1]);
                  float d2 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 2]);

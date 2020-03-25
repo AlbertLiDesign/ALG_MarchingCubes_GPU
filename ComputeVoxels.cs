@@ -52,7 +52,6 @@ namespace ALG_MarchingCubes
             #region 初始化MC数据
             //建立基box
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
-            Plane plane = new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.YAxis);
 
             //求三个方向上单元的数量
             Interval xD = box1.X;
@@ -95,7 +94,7 @@ namespace ALG_MarchingCubes
             double ta = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            MCgpu.runExtractActiveVoxels();
+            //MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
             #endregion
