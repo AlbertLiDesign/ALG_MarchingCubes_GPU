@@ -94,7 +94,7 @@ namespace ALG_MarchingCubes
             double ta = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            //MCgpu.runExtractActiveVoxels();
+            MCgpu.runExtractActiveVoxels();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
             #endregion
