@@ -37,8 +37,6 @@ namespace ALG_MarchingCubes
         public  int3 gridSize;
         public int[,] gridIndex3d;
 
-        public float3[] testPoint;
-
         // sample points
         private float3[] samplePts;
         public Point3d[] samplePoints;
@@ -522,8 +520,6 @@ namespace ALG_MarchingCubes
                  }
              });
             var result_Scan = Gpu.CopyToHost(Apts);
-            cubeValues = Gpu.CopyToHost(d_cubeValues);
-            testPoint = Gpu.CopyToHost(Apts);
             return ConvertFloat3ToPoint3d(result_Scan);
         }
 
