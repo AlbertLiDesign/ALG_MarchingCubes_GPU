@@ -211,7 +211,7 @@ namespace ALG_MarchingCubes
             int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
             int i = blockId * blockDim.x + threadIdx.x; //线程索引
 
-            //计算grid中的位置
+            //compute 3d index in the grid
             int3 gridPos = calcGridPos(i, constGridSize.Value);
             d_gridIdx[i] = gridPos;
             float3 p = new float3();
