@@ -206,22 +206,87 @@ namespace ALG_MarchingCubes
         }
         #endregion
         //classify all voxels according to their activity
-        [GpuManaged]
+        public void ClassifyVoxel(int3[] d_gridIdx, float3[] d_voxelV, int[] d_voxelVerts, int[] d_voxelOccupied, float3[] d_samplePts)
+        {
+            int blockId = blockIdx.y * gridDim.x + blockIdx.x; //block在grid中的位置
+            int i = blockId * blockDim.x + threadIdx.x; //线程索引
+
+            //计算grid中的位置
+            int3 gridPos = calcGridPos(i, constGridSize.Value);
+            d_gridIdx[i] = gridPos;
+            float3 p = new float3();
+
+            p.x = constBasePoint.Value.x + gridPos.x * constVoxelSize.Value.x;
+            p.y = constBasePoint.Value.y + gridPos.y * constVoxelSize.Value.y;
+            p.z = constBasePoint.Value.z + gridPos.z * constVoxelSize.Value.z;
+
+            // compute all vertices
+            d_voxelV[i * 8] = p;
+            d_voxelV[i * 8 + 1] = CreateFloat3(constVoxelSize.Value.x + p.x, 0 + p.y, 0 + p.z);
+            d_voxelV[i * 8 + 2] = CreateFloat3(constVoxelSize.Value.x + p.x, constVoxelSize.Value.y + p.y, 0 + p.z);
+            d_voxelV[i * 8 + 3] = CreateFloat3(0 + p.x, constVoxelSize.Value.y + p.y, 0 + p.z);
+            d_voxelV[i * 8 + 4] = CreateFloat3(0 + p.x, 0 + p.y, constVoxelSize.Value.z + p.z);
+            d_voxelV[i * 8 + 5] = CreateFloat3(constVoxelSize.Value.x + p.x, 0 + p.y, constVoxelSize.Value.z + p.z);
+            d_voxelV[i * 8 + 6] = CreateFloat3(constVoxelSize.Value.x + p.x, constVoxelSize.Value.y + p.y, constVoxelSize.Value.z + p.z);
+            d_voxelV[i * 8 + 7] = CreateFloat3(0 + p.x, constVoxelSize.Value.y + p.y, constVoxelSize.Value.z + p.z);
+
+            // compute cube value of each vertex
+            float d0 = ComputeValue(d_samplePts, d_voxelV[i * 8]);
+            float d1 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 1]);
+            float d2 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 2]);
+            float d3 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 3]);
+            float d4 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 4]);
+            float d5 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 5]);
+            float d6 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 6]);
+            float d7 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 7]);
+
+            //判定它们的状态
+            int cubeindex;
+            cubeindex = Compact(d0, constIsovalue.Value);
+            cubeindex += Compact(d1, constIsovalue.Value) * 2;
+            cubeindex += Compact(d2, constIsovalue.Value) * 4;
+            cubeindex += Compact(d3, constIsovalue.Value) * 8;
+            cubeindex += Compact(d4, constIsovalue.Value) * 16;
+            cubeindex += Compact(d5, constIsovalue.Value) * 32;
+            cubeindex += Compact(d6, constIsovalue.Value) * 64;
+            cubeindex += Compact(d7, constIsovalue.Value) * 128;
+
+            //根据表来查出该体素的顶点数
+            int numVerts = verticesTable[cubeindex];
+
+            d_voxelVerts[i] = numVerts;
+            if (numVerts > 0)
+            {
+                d_voxelOccupied[i] = 1;
+            }
+        }
         public void runClassifyVoxel()
         { 
             var gpu = Gpu.Default;
 
-            samplePts = ConvertPointsToFloat3(samplePoints);
+            int threads = 256;
+            Alea.dim3 gridDim = new Alea.dim3((numVoxels + threads - 1) / threads, 1, 1); //block的数量，维度
+            Alea.dim3 blockDim = new Alea.dim3(threads, 1, 1); //thread的数量，维度
 
-            //output parameters
-            var d_voxelVerts = gpu.Allocate<int>(numVoxels);
-            var d_voxelOccupied = gpu.Allocate<int>(numVoxels);
+            if (gridDim.x > 65535)
+            {
+                gridDim.y = gridDim.x / 32768;
+                gridDim.x = 32768;
+            }
+            LaunchParam lp = new LaunchParam(gridDim, blockDim);
 
-            float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8); 
-            float3[] d_samplePts = gpu.Allocate<float3>(samplePts);
+            // copy arguments
+            // output arguments
+            int[] d_voxelVerts = gpu.Allocate<int>(numVoxels);
+            int[] d_voxelOccupied = gpu.Allocate<int>(numVoxels);
+            float3[] d_voxelV = gpu.Allocate<float3>(numVoxels*8);
             int3[] d_gridIdx = gpu.Allocate<int3>(numVoxels);
 
-            //Copy const values
+            // input arguments
+            samplePts = ConvertPointsToFloat3(samplePoints);
+            float3[] d_samplePts = gpu.Allocate<float3>(samplePts);
+            
+            // copy const values
             float3 baseP = new float3((float)basePoint.X, (float)basePoint.Y, (float)basePoint.Z);
             gpu.Copy(isoValue, constIsovalue);
             gpu.Copy(baseP, constBasePoint);
@@ -229,73 +294,22 @@ namespace ALG_MarchingCubes
             gpu.Copy(gridSize, constGridSize);
             gpu.Copy(Tables.VertsTable, verticesTable);
 
-            gpu.For(0, numVoxels, i =>
-             {
-                 //计算grid中的位置
-                 int3 gridPos = calcGridPos(i, constGridSize.Value);
-                 d_gridIdx[i] = gridPos;
-                 float3 p = new float3();
+            // launch kernel
+            gpu.Launch(ClassifyVoxel, lp, d_gridIdx, d_voxelV, d_voxelVerts, d_voxelOccupied, d_samplePts);
 
-                 p.x = constBasePoint.Value.x + gridPos.x * constVoxelSize.Value.x;
-                 p.y = constBasePoint.Value.y + gridPos.y * constVoxelSize.Value.y;
-                 p.z = constBasePoint.Value.z + gridPos.z * constVoxelSize.Value.z;
-
-                 //输出所有顶点
-                 d_voxelV[i * 8] = p;
-                 d_voxelV[i * 8 + 1] = CreateFloat3(constVoxelSize.Value.x + p.x, 0 + p.y, 0 + p.z);
-                 d_voxelV[i * 8 + 2] = CreateFloat3(constVoxelSize.Value.x + p.x, constVoxelSize.Value.y + p.y, 0 + p.z);
-                 d_voxelV[i * 8 + 3] = CreateFloat3(0 + p.x, constVoxelSize.Value.y + p.y, 0 + p.z);
-                 d_voxelV[i * 8 + 4] = CreateFloat3(0 + p.x, 0 + p.y, constVoxelSize.Value.z + p.z);
-                 d_voxelV[i * 8 + 5] = CreateFloat3(constVoxelSize.Value.x + p.x, 0 + p.y, constVoxelSize.Value.z + p.z);
-                 d_voxelV[i * 8 + 6] = CreateFloat3(constVoxelSize.Value.x + p.x, constVoxelSize.Value.y + p.y, constVoxelSize.Value.z + p.z);
-                 d_voxelV[i * 8 + 7] = CreateFloat3(0 + p.x, constVoxelSize.Value.y + p.y, constVoxelSize.Value.z + p.z);
-
-                 //计算cube中的8个点对应的value
-                 float d0 = ComputeValue(d_samplePts, d_voxelV[i * 8]);
-                 float d1 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 1]);
-                 float d2 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 2]);
-                 float d3 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 3]);
-                 float d4 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 4]);
-                 float d5 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 5]);
-                 float d6 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 6]);
-                 float d7 = ComputeValue(d_samplePts, d_voxelV[i * 8 + 7]);
-
-                 //判定它们的状态
-                 int cubeindex;
-                 cubeindex = Compact(d0, constIsovalue.Value);
-                 cubeindex += Compact(d1, constIsovalue.Value) * 2;
-                 cubeindex += Compact(d2, constIsovalue.Value) * 4;
-                 cubeindex += Compact(d3, constIsovalue.Value) * 8;
-                 cubeindex += Compact(d4, constIsovalue.Value) * 16;
-                 cubeindex += Compact(d5, constIsovalue.Value) * 32;
-                 cubeindex += Compact(d6, constIsovalue.Value) * 64;
-                 cubeindex += Compact(d7, constIsovalue.Value) * 128;
-
-                 //根据表来查出该体素的顶点数
-                 int numVerts = verticesTable[cubeindex];
-
-                 d_voxelVerts[i] = numVerts;
-                 if (numVerts > 0)
-                 {
-                     d_voxelOccupied[i] = 1;
-                 }
-             });
-            
-            //所有单元
             result_voxelV = Gpu.CopyToHost(d_voxelV);
-            //活跃voxel的判定集合
             voxelOccupied = Gpu.CopyToHost(d_voxelOccupied);
-            //每个voxel中存在的顶点数
             voxelVerts = Gpu.CopyToHost(d_voxelVerts);
-            //每个voxel的三维索引
             gridIdx = Gpu.CopyToHost(d_gridIdx);
 
+            // free memory
+            Gpu.Free(d_voxelVerts);
+            Gpu.Free(d_voxelOccupied);
             Gpu.Free(d_voxelV);
-            Gpu.Free(d_samplePts);
             Gpu.Free(d_gridIdx);
+            Gpu.Free(d_samplePts);
         }
         //reduce empty voxel and extract active voxels
-        [GpuManaged]
         public void runExtractActiveVoxels()
         {
             var gpu = Gpu.Default;

@@ -80,7 +80,7 @@ namespace ALG_MarchingCubes
             sw.Restart();
             #region classify voxel and reduce data
             MCgpu.runClassifyVoxel();
-            MCgpu.runExtractActiveVoxels();
+            //MCgpu.runExtractActiveVoxels();
             #endregion
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
