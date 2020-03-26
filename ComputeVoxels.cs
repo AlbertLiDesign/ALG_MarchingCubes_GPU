@@ -28,6 +28,7 @@ namespace ALG_MarchingCubes
         {
             pManager.AddCurveParameter("Boundary", "B", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
             pManager.AddGenericParameter("Voxel", "V", "Voxel", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -37,6 +38,7 @@ namespace ALG_MarchingCubes
             double scale = 1.0;
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
+            List<double> time = new List<double>();
 
             DA.GetDataList("Geometries", geos);
             DA.GetData("BoundaryRatio", ref boundaryRatio);
@@ -45,6 +47,8 @@ namespace ALG_MarchingCubes
             #endregion
 
             #region initialization
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
 
             Interval xD = box1.X;
@@ -69,18 +73,27 @@ namespace ALG_MarchingCubes
             Alea.float3 voxelS = new Alea.float3((float)scale, (float)scale, (float)scale);
 
             var MCgpu = new MarchingCubes_GPU(baseP, box1, gridS, voxelS, (float)scale, (float)isovalue, samplePoints.ToArray());
+            sw.Stop();
+            double ta = sw.Elapsed.TotalMilliseconds;
             #endregion
 
+            sw.Restart();
             #region classify voxel and reduce data
             MCgpu.runClassifyVoxel();
             MCgpu.runExtractActiveVoxels();
             #endregion
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
 
             this.Message = MCgpu.numVoxels.ToString();
             #region output voxel data
             List<Line> boundaries = BasicFunctions.GetBoundingBoxBoundaries(MCgpu.sourceBox);
+
+            time.Add(ta);
+            time.Add(tb);
             DA.SetDataList("Boundary", boundaries);
             DA.SetData("Voxel", MCgpu);
+            DA.SetDataList("Time", time);
             #endregion
         }
 
