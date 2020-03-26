@@ -33,7 +33,7 @@ namespace ALG_MarchingCubes
             Stopwatch sw = new Stopwatch();
 
             List<double> time = new List<double>();
-            #region 提取Isosurface点集
+            #region extract all vertices of the Isosurface
             sw.Start();
             List<Point3d> resultPts = new List<Point3d>();
             resultPts = MCgpu.runExtractIsoSurfaceGPU();
@@ -41,7 +41,7 @@ namespace ALG_MarchingCubes
             double ta = sw.Elapsed.TotalMilliseconds;
             #endregion
 
-            #region 提取网格、检查网格
+            #region extract the mesh from result vertices
             sw.Restart();
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
             sw.Stop();

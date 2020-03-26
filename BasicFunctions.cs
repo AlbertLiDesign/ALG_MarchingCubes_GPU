@@ -127,13 +127,16 @@ namespace ALG_MarchingCubes
         {
             Mesh mesh = new Mesh();
             int FCount = pts.Count / 3;
-            for (int i = 0; i < FCount; i++)
-            {
-                Point3d[] vertices = new Point3d[3] { pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2] };
-                MeshFace mf = new MeshFace(i * 3, i * 3 + 1, i * 3 + 2);
-                mesh.Vertices.AddVertices(vertices);
-                mesh.Faces.AddFace(mf);
-            }
+
+            mesh.Vertices.AddVertices(pts);
+
+            MeshFace[] mfs = new MeshFace[FCount];
+            Parallel.For(0, FCount, i =>
+           {
+               MeshFace mf = new MeshFace(i * 3, i * 3 + 1, i * 3 + 2);
+               mfs[i] = mf;
+           });
+            mesh.Faces.AddFaces(mfs);
             return mesh;
         }
 
