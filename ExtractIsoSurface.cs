@@ -18,6 +18,7 @@ namespace ALG_MarchingCubes
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddGenericParameter("Voxels", "V", "Voxels", GH_ParamAccess.item);
+            pManager.AddBooleanParameter("Weld", "W", "Weld mesh", GH_ParamAccess.item);
         }
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
@@ -29,7 +30,9 @@ namespace ALG_MarchingCubes
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             MarchingCubes_GPU MCgpu = new MarchingCubes_GPU();
+            bool weld = false;
             DA.GetData("Voxels", ref MCgpu);
+            DA.GetData("Weld", ref weld);
             Stopwatch sw = new Stopwatch();
 
             List<double> time = new List<double>();
@@ -48,12 +51,21 @@ namespace ALG_MarchingCubes
             double tb = sw.Elapsed.TotalMilliseconds;
 
             sw.Restart();
-            mesh.Faces.CullDegenerateFaces();
-            mesh.Vertices.CombineIdentical(true, true);
-            mesh.Vertices.CullUnused();
-            mesh.Weld(3.1415926535897931);
-            mesh.FaceNormals.ComputeFaceNormals();
-            mesh.Normals.ComputeNormals();
+            if (weld)
+            {
+                mesh.Faces.CullDegenerateFaces();
+                mesh.Vertices.CombineIdentical(true, true);
+                mesh.Vertices.CullUnused();
+                mesh.Weld(3.1415926535897931);
+                mesh.FaceNormals.ComputeFaceNormals();
+                mesh.Normals.ComputeNormals();
+            }
+            else
+            {
+                mesh.Faces.CullDegenerateFaces();
+                mesh.FaceNormals.ComputeFaceNormals();
+                mesh.Normals.ComputeNormals();
+            }
             sw.Stop();
             double tc = sw.Elapsed.TotalMilliseconds;
             #endregion
