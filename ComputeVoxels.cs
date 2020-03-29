@@ -80,10 +80,15 @@ namespace ALG_MarchingCubes
             sw.Restart();
             #region classify voxel and reduce data
             MCgpu.runClassifyVoxel();
-            MCgpu.runExtractActiveVoxels();
-            #endregion
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
+            sw.Restart();
+            MCgpu.runExtractActiveVoxels();
+            sw.Stop();
+            double tc = sw.Elapsed.TotalMilliseconds;
+            #endregion
+
+
 
             this.Message = MCgpu.numVoxels.ToString();
             #region output voxel data
@@ -91,6 +96,7 @@ namespace ALG_MarchingCubes
 
             time.Add(ta);
             time.Add(tb);
+            time.Add(tc);
             DA.SetDataList("Boundary", boundaries);
             DA.SetData("Voxel", MCgpu);
             DA.SetDataList("Time", time);

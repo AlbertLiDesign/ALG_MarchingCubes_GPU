@@ -23,7 +23,6 @@ namespace ALG_MarchingCubes
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddPointParameter("testPoint", "", "", GH_ParamAccess.list);
-            pManager.AddPointParameter("activeVoxel", "", "", GH_ParamAccess.list);
             pManager.AddNumberParameter("verts_scanIdx", "", "", GH_ParamAccess.list);
             pManager.AddNumberParameter("cubeValues", "", "", GH_ParamAccess.list);
         }
@@ -35,7 +34,6 @@ namespace ALG_MarchingCubes
 
             //MCgpu.ConvertFloat3ToPoint3d(MCgpu.testPoint)
             DA.SetDataList("testPoint",null );
-            DA.SetDataList("activeVoxel", MCgpu.ConvertFloat3ToPoint3d(MCgpu.model_voxelActive));
             DA.SetDataList("verts_scanIdx", MCgpu.verts_scanIdx);
             DA.SetDataList("cubeValues", MCgpu.cubeValues);
         }
