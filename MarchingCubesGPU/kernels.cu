@@ -116,8 +116,7 @@ __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridS
     }
 }
 
-extern "C" void
-launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
+extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
     uint numVoxels, float3 basePoint, float3 voxelSize,
     float isoValue, float3 * samplePts, uint sampleLength)
 {
@@ -258,6 +257,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
 
     // read number of vertices from texture
     uint numVerts = tex1Dfetch(vertexTexture, cubeindex);
+
     for (int j = 0; j < numVerts; j++)
     {
         //find out which edge intersects the isosurface
@@ -268,8 +268,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     }
 }
 
-extern "C" void
-launch_extractIsosurface(dim3 grid, dim3 threads,
+extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
     float3 * samplePts, uint sampleLength)

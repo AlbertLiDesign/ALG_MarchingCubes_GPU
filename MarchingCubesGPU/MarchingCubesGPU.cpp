@@ -13,6 +13,8 @@
 
 #include "MarchingCubesGPU.h"
 
+#include<time.h>
+
 int main()
 {
     initMC();
@@ -21,7 +23,10 @@ int main()
 
     cleanup();
 
+    clock_t start6 = clock();
     writeFile(outputPath);
+    clock_t end6 = clock();
+    cout << "writeFile: " << (double)(end6 - start6) / CLOCKS_PER_SEC * 1000 << endl;
     system("PAUSE");
 }
 
@@ -87,15 +92,25 @@ void writeFile(string filename)
 
 void initMC()
 {
+    clock_t start1 = clock();
     loadFile(filePath);
+    clock_t end1 = clock();
+    
 
     cout << "Arguments: " << endl;
     cout << gridSize.x << ' ' << gridSize.y << ' ' << gridSize.z << endl;
     cout << "isoVaule = " << isoValue << '\t' << "Scale = " << scale << endl;
     cout << sampleLength << endl;
 
+    cout << "loadFile: " << (double)(end1 - start1) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start2 = clock();
+
     // allocate textures
     allocateTextures(&d_edgeTable, &d_triTable, &d_numVertsTable);
+
+    clock_t end2 = clock();
+    cout << "allocateTextures: " << (double)(end2 - start2) / CLOCKS_PER_SEC * 1000 << endl;
 
     // allocate device memory
     unsigned int memSize = sizeof(uint) * numVoxels;
@@ -127,6 +142,8 @@ void cleanup()
 }
 void runComputeIsosurface()
 {
+    clock_t start3 = clock();
+
     int threads = 128;
     dim3 grid((numVoxels+threads -1) / threads, 1, 1);
 
@@ -142,12 +159,20 @@ void runComputeIsosurface()
         d_voxelVerts, d_voxelOccupied, gridSize,
         numVoxels, basePoint, voxelSize, isoValue, d_samplePts, sampleLength);
 
+    clock_t end3 = clock();
+    cout << "launch_classifyVoxel: " << (double)(end3 - start3) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start4 = clock();
     // after classifying voxels, we will get a lot of empty voxels.
     // in order to cull them, we have to use exclusive sum scan to get a new array
     // the last element in this new array plus the last element in the array before scan 
     // equals the number of active voxels
     exclusiveSumScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
 
+    clock_t end4 = clock();
+    cout << "exclusiveSumScan: " << (double)(end4 - start4) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start41 = clock();
     uint lastElement, lastScanElement;
     // only copy the last elements from two arrays on the device
     checkCudaErrors(cudaMemcpy((void*)&lastElement,
@@ -159,8 +184,8 @@ void runComputeIsosurface()
 
     // comput the number of active voxels
     num_activeVoxels = lastElement + lastScanElement;
-
-    cout << num_activeVoxels << endl;
+    clock_t end41 = clock();
+    cout << "Find_num_activeVoxels: " << (double)(end41 - start41) / CLOCKS_PER_SEC * 1000 << endl;
 
     if (num_activeVoxels == 0)
     {
@@ -169,12 +194,21 @@ void runComputeIsosurface()
         return;
     }
 
+    clock_t start42 = clock();
     // compact voxel index array
     launch_compactVoxels(grid, threads, d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
 
+    clock_t end42 = clock();
+    cout << "launch_compactVoxels: " << (double)(end42 - start42) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start43 = clock();
     // compute the number of output vertices
     exclusiveSumScan(d_voxelVertsScan, d_voxelVerts, numVoxels);
 
+    clock_t end43 = clock();
+    cout << "exclusiveSumScan: " << (double)(end43 - start43) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start44 = clock();
     uint lastElement2, lastScanElement2;
     checkCudaErrors(cudaMemcpy((void*)&lastElement2,
         (void*)(d_voxelVerts + numVoxels - 1),
@@ -184,9 +218,11 @@ void runComputeIsosurface()
         sizeof(uint), cudaMemcpyDeviceToHost));
     num_resultVertices = lastElement2 + lastScanElement2;
 
-    cout << num_resultVertices << endl;
-
     checkCudaErrors(cudaMalloc((void**)&(d_result), num_resultVertices * sizeof(float3)));
+    clock_t end44 = clock();
+    cout << "Find_num_resultVertices: " << (double)(end44 - start44) / CLOCKS_PER_SEC * 1000 << endl;
+
+    clock_t start5 = clock();
 
     dim3 grid2((num_activeVoxels + threads - 1) / threads, 1, 1);
 
@@ -206,5 +242,8 @@ void runComputeIsosurface()
     checkCudaErrors(cudaMemcpy(resultPts,
         d_result, num_resultVertices * sizeof(float3),
         cudaMemcpyDeviceToHost));
+
+    clock_t end5 = clock();
+    cout << "launch_extractIsosurface: " << (double)(end5 - start5) / CLOCKS_PER_SEC * 1000 << endl;
 }
 

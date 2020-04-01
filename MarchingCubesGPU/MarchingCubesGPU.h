@@ -8,17 +8,14 @@ typedef unsigned char uchar;
 
 using namespace std;
 
-extern "C" void
-launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
+extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
     uint numVoxels, float3 basePoint, float3 voxelSize,
     float isoValue, float3 * samplePts, uint sampleLength);
 
-extern "C" void
-launch_compactVoxels(dim3 grid, dim3 threads, uint * compactedVoxelArray, uint * voxelOccupied,
+extern "C" void launch_compactVoxels(dim3 grid, dim3 threads, uint * compactedVoxelArray, uint * voxelOccupied,
     uint * voxelOccupiedScan, uint numVoxels);
 
-extern "C" void
-launch_extractIsosurface(dim3 grid, dim3 threads,
+extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
     float3 * samplePts, uint sampleLength);
