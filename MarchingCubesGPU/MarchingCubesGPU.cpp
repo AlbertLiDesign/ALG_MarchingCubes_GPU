@@ -17,7 +17,8 @@
 
 #include<time.h>
 
-float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int yCount, int zCount, float3* samplePoints)
+float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int yCount, int zCount, 
+    float s, float iso, float3* samplePoints)
 {
     sampleLength = sampleCount;
     basePoint = bP;
@@ -25,6 +26,8 @@ float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int 
     gridSize = make_uint3(xCount, yCount, zCount);
     numVoxels = xCount * yCount * zCount;
     samplePts = samplePoints;
+    scale = s;
+    isoValue = iso;
 
     initMC();
 
