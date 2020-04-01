@@ -15,16 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\CUDA\Dll1\dllmain.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\CUDA\Dll1\framework.h">
+    <ClInclude Include="..\..\ALG_MarchingCubes\MarchingCubesGPU\MarchingCubesGPU.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="tables.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="kernels.cu" />
+    <ClCompile Include="..\..\ALG_MarchingCubes\MarchingCubesGPU\MarchingCubesGPU.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="kernels.cu">
+      <Filter>源文件</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

@@ -2,6 +2,8 @@
 #include <cuda_runtime.h>
 #include <vector_types.h>
 #include <vector_functions.h>
+#include <SDKDDKVer.h>
+
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -22,6 +24,8 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
 
 extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable);
 extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements);
+
+extern "C" __declspec(dllexport)  float3 * marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int yCount, int zCount, float3 * samplePoints);
 
 
 // constants

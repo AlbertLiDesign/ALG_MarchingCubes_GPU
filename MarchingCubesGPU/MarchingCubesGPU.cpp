@@ -10,24 +10,29 @@
 
 #include <helper_cuda.h>
 #include <helper_functions.h>
+#include <device_launch_parameters.h>
 
 #include "MarchingCubesGPU.h"
 
+
 #include<time.h>
 
-int main()
+float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int yCount, int zCount, float3* samplePoints)
 {
+    sampleLength = sampleCount;
+    basePoint = bP;
+    voxelSize = vS;
+    gridSize = make_uint3(xCount, yCount, zCount);
+    numVoxels = xCount * yCount * zCount;
+    samplePts = samplePoints;
+
     initMC();
 
     runComputeIsosurface();
 
     cleanup();
 
-    clock_t start6 = clock();
-    writeFile(outputPath);
-    clock_t end6 = clock();
-    cout << "writeFile: " << (double)(end6 - start6) / CLOCKS_PER_SEC * 1000 << endl;
-    system("PAUSE");
+    return resultPts;
 }
 
 // Load arguments
@@ -92,18 +97,6 @@ void writeFile(string filename)
 
 void initMC()
 {
-    clock_t start1 = clock();
-    loadFile(filePath);
-    clock_t end1 = clock();
-    
-
-    cout << "Arguments: " << endl;
-    cout << gridSize.x << ' ' << gridSize.y << ' ' << gridSize.z << endl;
-    cout << "isoVaule = " << isoValue << '\t' << "Scale = " << scale << endl;
-    cout << sampleLength << endl;
-
-    cout << "loadFile: " << (double)(end1 - start1) / CLOCKS_PER_SEC * 1000 << endl;
-
     clock_t start2 = clock();
 
     // allocate textures
@@ -246,4 +239,3 @@ void runComputeIsosurface()
     clock_t end5 = clock();
     cout << "launch_extractIsosurface: " << (double)(end5 - start5) / CLOCKS_PER_SEC * 1000 << endl;
 }
-
