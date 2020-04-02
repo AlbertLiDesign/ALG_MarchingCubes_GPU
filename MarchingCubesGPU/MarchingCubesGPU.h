@@ -25,9 +25,23 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
 extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable);
 extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements);
 
-extern "C" __declspec(dllexport)  float3 * marchingcubesGPU(int sampleCount, float3 bP, float3 vS, 
-    int xCount, int yCount, int zCount, float s, float iso, float3 * samplePoints);
 
+struct cfloat3
+{
+    float x, y, z;
+};
+float3 Convert(cfloat3 a)
+{
+    return make_float3(a.x, a.y, a.z);
+}
+cfloat3 Convert(float3 a)
+{
+    cfloat3 cf;
+    cf.x = a.x;
+    cf.y = a.y;
+    cf.z = a.z;
+    return cf;
+}
 
 // constants
 const string filePath = "E:\\pts.txt";

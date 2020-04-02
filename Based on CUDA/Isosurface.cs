@@ -27,7 +27,7 @@ namespace ALG_MarchingCubes
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddPointParameter("Points", "B", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
+            pManager.AddPointParameter("Points", "P", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -76,7 +76,7 @@ namespace ALG_MarchingCubes
 
             List<Point3d> pts = isoSurface.runIsosurface();
 
-            DA.SetDataList("Point", pts);
+            DA.SetDataList("Points", pts);
         }
 
         protected override Bitmap Icon => null;

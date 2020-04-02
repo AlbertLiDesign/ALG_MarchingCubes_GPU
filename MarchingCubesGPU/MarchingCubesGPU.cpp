@@ -14,20 +14,28 @@
 
 #include "MarchingCubesGPU.h"
 
-
 #include<time.h>
 
-float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int yCount, int zCount, 
-    float s, float iso, float3* samplePoints)
+extern "C" __declspec(dllexport)  cfloat3 * marchingcubesGPU(cfloat3 bP, cfloat3 vS,
+    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, int sampleCount, uint * resultLength);
+
+cfloat3* marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount, 
+    float s, float iso, cfloat3* samplePoints, int sampleCount, uint* resultLength)
 {
+
     sampleLength = sampleCount;
-    basePoint = bP;
-    voxelSize = vS;
+    basePoint = Convert(bP);
+    voxelSize = Convert(vS);
     gridSize = make_uint3(xCount, yCount, zCount);
     numVoxels = xCount * yCount * zCount;
-    samplePts = samplePoints;
     scale = s;
     isoValue = iso;
+
+    samplePts = new float3[sampleCount];
+    for (int i = 0; i < sampleCount; i++)
+    {
+        samplePts[i] = Convert(samplePoints[i]);
+    }
 
     initMC();
 
@@ -35,9 +43,15 @@ float3* marchingcubesGPU(int sampleCount, float3 bP, float3 vS, int xCount, int 
 
     cleanup();
 
-    return resultPts;
+    cfloat3* results = new cfloat3[num_resultVertices];
+    for (int i = 0; i < num_resultVertices; i++)
+    {
+        results[i] = Convert(resultPts[i]);
+    }
+    resultLength = &num_resultVertices;
+    delete[] samplePts;
+    return results;
 }
-
 // Load arguments
 float3* loadFile(string filename)
 {
@@ -242,3 +256,5 @@ void runComputeIsosurface()
     clock_t end5 = clock();
     cout << "launch_extractIsosurface: " << (double)(end5 - start5) / CLOCKS_PER_SEC * 1000 << endl;
 }
+
+

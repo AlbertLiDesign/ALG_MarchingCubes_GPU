@@ -96,6 +96,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(CudaToolkitDir)/include;C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.2\common\inc</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
