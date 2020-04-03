@@ -38,37 +38,44 @@ namespace ALG_MarchingCubes.Based_on_CUDA
             this.samplePoints = samplePoints;
         }
 
-        [DllImport("MarchingCubesDLL.dll")]
-        public static extern IntPtr marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,float s, float iso, cfloat3[] samplePoints, int sampleCount, ref uint resultLength);
+        [DllImport("MarchingCubesDLL.dll", EntryPoint = "marchingcubesGPU")]
+        public static extern IntPtr marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength);
 
+        [DllImport("MarchingCubesDLL.dll", EntryPoint = "freeMemory")]
+        public static extern void freeMemory(IntPtr a);
         public List<Point3d> runIsosurface()
         {
             List<Point3d> pts = new List<Point3d>();
             int sampleCount = samplePoints.Count();
             cfloat3 bP = ConvertPtToFloat3(basePoint);
             cfloat3 vS = ConvertPtToFloat3(voxelSize);           
-            uint resultLength = 0;
             cfloat3[] smaplePts = new cfloat3[sampleCount];
             for (int i = 0; i < sampleCount; i++)
             {
                 smaplePts[i] = ConvertPtToFloat3(samplePoints[i]);
             }
 
-            IntPtr result = marchingcubesGPU(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
+            uint resultLength = 0;
 
-            IntPtr[] resultsPtr = new IntPtr[resultLength];
-            Marshal.Copy(result, resultsPtr, 0, (int)resultLength);
+            marchingcubesGPU(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
 
-            cfloat3[] resultPoints = new cfloat3[resultLength];
-            for (int i = 0; i < resultLength; i++)
-            {
-                resultPoints[i] = (cfloat3)Marshal.PtrToStructure(resultsPtr[i], typeof(cfloat3));
-            }
+            //int resultL = (int)resultLength;
 
-            for (int i = 0; i < resultLength; i++)
-            {
-                pts.Add(ConvertFloat3ToPt(resultPoints[i]));
-            }
+            //IntPtr[] resultsPtr = new IntPtr[resultL];
+            //Marshal.Copy(result, resultsPtr, 0, resultL) ;
+
+            //cfloat3[] resultPoints = new cfloat3[resultL];
+            //for (int i = 0; i < resultL; i++)
+            //{
+            //    resultPoints[i] = (cfloat3)Marshal.PtrToStructure(resultsPtr[i], typeof(cfloat3));
+            //}
+
+            //for (int i = 0; i < resultL; i++)
+            //{
+            //    pts.Add(ConvertFloat3ToPt(resultPoints[i]));
+            //}
+            //freeMemory(result);
             return pts;
         }
 

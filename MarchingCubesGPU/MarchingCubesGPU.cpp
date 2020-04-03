@@ -16,11 +16,65 @@
 
 #include<time.h>
 
-extern "C" __declspec(dllexport)  cfloat3 * marchingcubesGPU(cfloat3 bP, cfloat3 vS,
-    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, int sampleCount, uint * resultLength);
+extern "C" __declspec(dllexport)  void marchingcubesGPU(cfloat3 bP, cfloat3 vS,
+    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, 
+    int sampleCount, size_t& resultLength);
+extern "C" __declspec(dllexport)  void freeMemory(cfloat3 * a);
 
-cfloat3* marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount, 
-    float s, float iso, cfloat3* samplePoints, int sampleCount, uint* resultLength)
+
+//cfloat3* marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+//    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength);
+//
+//int main()
+//{
+//    ifstream inFile;
+//
+//    inFile.open(filePath);
+//    cout << "pts.txt open scessful" << endl;
+//
+//    string s;
+//    getline(inFile, s);
+//    int sampleCount = stoi(s);
+//
+//    float bf1, bf2, bf3;
+//    inFile >> bf1 >> bf2 >> bf3;
+//    cfloat3 bp = Convert(make_float3(bf1, bf2, bf3));
+//
+//    float ss, iso;
+//    inFile >> ss >> iso;
+//    cfloat3 vS = Convert(make_float3(1, 1, 1));
+//
+//    int xCount, yCount, zCount;
+//    inFile >> xCount >> yCount >> zCount;
+//
+//    cfloat3* samplePoints = new cfloat3[sampleCount*sizeof(cfloat3)];
+//    int i = 0;
+//    float f1, f2, f3;
+//    while (inFile >> f1 >> f2 >> f3)
+//    {
+//        samplePoints[i] = Convert(make_float3(f1, f2, f3));
+//        i++;
+//    }
+//
+//    inFile.close();
+//
+//    size_t resultLength = 0;
+//    cfloat3* result = marchingcubesGPU(bp, vS, xCount, yCount, zCount, ss, iso, samplePoints, sampleCount, resultLength);
+//
+//    ofstream outFile;
+//    outFile.open(outputPath);
+//    if (outFile.is_open())
+//    {
+//        for (size_t i = 0; i < num_resultVertices; i++)
+//        {
+//            outFile << result[i].x << '\t' << result[i].y << '\t' << result[i].z << endl;
+//        }
+//        outFile.close();
+//    }
+//}
+
+void marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength)
 {
 
     sampleLength = sampleCount;
@@ -48,9 +102,12 @@ cfloat3* marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zC
     {
         results[i] = Convert(resultPts[i]);
     }
-    resultLength = &num_resultVertices;
-    delete[] samplePts;
-    return results;
+    delete[] resultPts;
+    resultLength = (size_t)num_resultVertices;
+}
+void freeMemory(cfloat3* a)
+{
+    delete[] a;
 }
 // Load arguments
 float3* loadFile(string filename)
@@ -149,12 +206,13 @@ void cleanup()
     checkCudaErrors(cudaFree(d_compVoxelArray));
 
     checkCudaErrors(cudaFree(d_samplePts));
+    delete[] samplePts;
 }
 void runComputeIsosurface()
 {
     clock_t start3 = clock();
 
-    int threads = 128;
+    int threads = 256;
     dim3 grid((numVoxels+threads -1) / threads, 1, 1);
 
     // get around maximum grid size of 65535 in each dimension
@@ -227,8 +285,10 @@ void runComputeIsosurface()
         (void*)(d_voxelVertsScan + numVoxels - 1),
         sizeof(uint), cudaMemcpyDeviceToHost));
     num_resultVertices = lastElement2 + lastScanElement2;
+    cout << num_activeVoxels << endl;
 
     checkCudaErrors(cudaMalloc((void**)&(d_result), num_resultVertices * sizeof(float3)));
+
     clock_t end44 = clock();
     cout << "Find_num_resultVertices: " << (double)(end44 - start44) / CLOCKS_PER_SEC * 1000 << endl;
 
@@ -247,8 +307,7 @@ void runComputeIsosurface()
         gridSize, basePoint, voxelSize,
         isoValue, scale, d_samplePts, sampleLength);
 
-    resultPts = new float3[num_resultVertices * sizeof(float3)];
-
+    resultPts = new float3[num_resultVertices];
     checkCudaErrors(cudaMemcpy(resultPts,
         d_result, num_resultVertices * sizeof(float3),
         cudaMemcpyDeviceToHost));

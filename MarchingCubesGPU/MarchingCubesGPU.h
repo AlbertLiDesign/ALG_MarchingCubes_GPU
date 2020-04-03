@@ -46,6 +46,7 @@ cfloat3 Convert(float3 a)
 // constants
 const string filePath = "E:\\pts.txt";
 const string outputPath = "E:\\result.txt";
+const string outputPath2 = "E:\\scan.txt";
 
 float3 basePoint;
 uint3 gridSize;

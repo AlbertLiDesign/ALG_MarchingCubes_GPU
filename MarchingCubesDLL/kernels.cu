@@ -161,7 +161,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     uint i = __mul24(blockId, blockDim.x) + threadIdx.x;
 
     // compute position in 3d grid
-    uint3 gridPos = calcGridPos(i, gridSize);
+    uint3 gridPos = calcGridPos(compactedVoxelArray[i], gridSize);
 
     float3 p;
     p.x = basePoint.x + gridPos.x * voxelSize.x;
@@ -262,7 +262,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     {
         //find out which edge intersects the isosurface
         uint edge = tex1Dfetch(faceTexture, cubeindex * 16 + j);
-        uint index = numVertsScanned[i] + j;
+        uint index = numVertsScanned[compactedVoxelArray[i]] + j;
 
         result[index] = vertlist[edge];
     }
@@ -271,7 +271,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
 extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
-    float3 * samplePts, uint sampleLength)
+    float3 * samplePts, uint sampleLength, float3 * d_activeVerts)
 {
     extractIsosurface << <grid, threads >> > (result, compactedVoxelArray, numVertsScanned,
         gridSize, basePoint, voxelSize, isoValue, scale,
