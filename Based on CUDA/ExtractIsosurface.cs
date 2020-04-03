@@ -38,9 +38,11 @@ namespace ALG_MarchingCubes.Based_on_CUDA
             this.samplePoints = samplePoints;
         }
 
-        [DllImport("MarchingCubesDLL.dll", EntryPoint = "marchingcubesGPU")]
-        public static extern IntPtr marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+        [DllImport("MarchingCubesDLL.dll", EntryPoint = "computMC")]
+        public static extern void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
             float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength);
+        [DllImport("MarchingCubesDLL.dll", EntryPoint = "getResult")]
+        public static extern void getResult(IntPtr result);
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "freeMemory")]
         public static extern void freeMemory(IntPtr a);
@@ -57,25 +59,19 @@ namespace ALG_MarchingCubes.Based_on_CUDA
             }
 
             uint resultLength = 0;
+            computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
 
-            marchingcubesGPU(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
+            int size = Marshal.SizeOf(typeof(cfloat3)) * (int)resultLength;
+            IntPtr result = Marshal.AllocHGlobal(size);
 
-            //int resultL = (int)resultLength;
+            getResult(result);
 
-            //IntPtr[] resultsPtr = new IntPtr[resultL];
-            //Marshal.Copy(result, resultsPtr, 0, resultL) ;
-
-            //cfloat3[] resultPoints = new cfloat3[resultL];
-            //for (int i = 0; i < resultL; i++)
-            //{
-            //    resultPoints[i] = (cfloat3)Marshal.PtrToStructure(resultsPtr[i], typeof(cfloat3));
-            //}
-
-            //for (int i = 0; i < resultL; i++)
-            //{
-            //    pts.Add(ConvertFloat3ToPt(resultPoints[i]));
-            //}
-            //freeMemory(result);
+            for (int i = 0; i < (int)resultLength; i++)
+            {
+                IntPtr pPointor = new IntPtr(result.ToInt64() + Marshal.SizeOf(typeof(cfloat3)) * i);
+                pts.Add(ConvertFloat3ToPt((cfloat3)Marshal.PtrToStructure(pPointor, typeof(cfloat3))));
+            }
+            Marshal.FreeHGlobal(result);
             return pts;
         }
 

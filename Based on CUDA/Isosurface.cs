@@ -27,7 +27,8 @@ namespace ALG_MarchingCubes
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddPointParameter("Points", "P", "The boundingbox Boundary of input geometries.", GH_ParamAccess.list);
+            pManager.AddMeshParameter("Mesh", "P", "The boundingbox Boundary of input geometries.", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -47,7 +48,6 @@ namespace ALG_MarchingCubes
 
             #region initialization
             Stopwatch sw = new Stopwatch();
-            sw.Start();
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
 
             Interval xD = box1.X;
@@ -71,12 +71,33 @@ namespace ALG_MarchingCubes
             Point3d voxelS = new Point3d(scale, scale, scale);
 
             var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, voxelS, (float)scale, (float)isovalue, samplePoints);
-            sw.Stop();
             #endregion
 
-            List<Point3d> pts = isoSurface.runIsosurface();
+            sw.Restart();
+            List<Point3d> resultPts = isoSurface.runIsosurface();
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
 
-            DA.SetDataList("Points", pts);
+            #region extract the mesh from result vertices
+            sw.Restart();
+            Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
+            sw.Stop();
+            double ta = sw.Elapsed.TotalMilliseconds;
+
+            sw.Restart();
+                mesh.Faces.CullDegenerateFaces();
+                mesh.FaceNormals.ComputeFaceNormals();
+                mesh.Normals.ComputeNormals();
+            sw.Stop();
+            double tc = sw.Elapsed.TotalMilliseconds;
+            #endregion
+
+            time.Add(ta);
+            time.Add(tb);
+            time.Add(tc);
+
+            DA.SetData("Mesh", mesh);
+            DA.SetDataList("Time", time);
         }
 
         protected override Bitmap Icon => null;

@@ -2,14 +2,15 @@
 #include <string.h>
 
 #include <cuda_runtime_api.h>
+
 #include <thrust/device_vector.h>
 #include <thrust/scan.h>
 #include <device_launch_parameters.h>
+
 #include <helper_cuda.h>
 #include <helper_math.h>
 
 #include "tables.h"
-
 
 // textures containing look-up tables
 texture<uint, 1, cudaReadModeElementType> edgeTexture;
@@ -17,8 +18,7 @@ texture<uint, 1, cudaReadModeElementType> faceTexture;
 texture<uint, 1, cudaReadModeElementType> vertexTexture;
 
 
-extern "C"
-void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable)
+extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable)
 {
     checkCudaErrors(cudaMalloc((void**)d_edgeTable, 256 * sizeof(uint)));
     checkCudaErrors(cudaMemcpy((void*)*d_edgeTable, (void*)edgeTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
@@ -112,19 +112,11 @@ __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridS
     if (i < numVoxels)
     {
         voxelVerts[i] = numVerts;
-        voxelOccupied[i] = (numVerts > 0);
+        if ((numVerts > 0))
+        {
+            voxelOccupied[i] = 1;
+        }
     }
-}
-
-extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
-    uint numVoxels, float3 basePoint, float3 voxelSize,
-    float isoValue, float3 * samplePts, uint sampleLength)
-{
-    // calculate number of vertices need per voxel
-    classifyVoxel << <grid, threads >> > (voxelVerts, voxelOccupied, gridSize,
-        numVoxels, basePoint, voxelSize,
-        isoValue, samplePts, sampleLength);
-    getLastCudaError("classifyVoxel failed");
 }
 
 // compact voxel array
@@ -139,19 +131,6 @@ __global__ void compactVoxels(uint* compactedVoxelArray, uint* voxelOccupied, ui
     }
 }
 
-extern "C" void launch_compactVoxels(dim3 grid, dim3 threads, uint * compactedVoxelArray, uint * voxelOccupied, uint * voxelOccupiedScan, uint numVoxels)
-{
-    compactVoxels << <grid, threads >> > (compactedVoxelArray, voxelOccupied,
-        voxelOccupiedScan, numVoxels);
-    getLastCudaError("compactVoxels failed");
-}
-
-extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements)
-{
-    thrust::exclusive_scan(thrust::device_ptr<unsigned int>(input),
-        thrust::device_ptr<unsigned int>(input + numElements),
-        thrust::device_ptr<unsigned int>(output));
-}
 
 __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uint* numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
@@ -268,10 +247,63 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     }
 }
 
+__global__ void scan(uint* d_in, uint* d_out, uint n)
+{
+    extern __shared__ uint sdata[];
+    int i;
+    uint tid = threadIdx.x;
+
+    sdata[tid] = d_in[tid];
+
+    for (i = 1; i < n; i <<= 1)
+    {
+
+        if (tid >= i)
+        {
+            sdata[tid] += sdata[tid - i];
+        }
+        __syncthreads();
+    }
+    d_out[tid] = sdata[tid];
+    __syncthreads();
+}
+extern "C" void launch_scan(dim3 grid, dim3 threads, uint * d_input, uint * d_output, uint n)
+{
+    // calculate number of vertices need per voxel
+    scan << <grid, threads, sizeof(uint)* threads.x >> > (d_input, d_output, n);
+    getLastCudaError("scan failed");
+}
+
+extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
+    uint numVoxels, float3 basePoint, float3 voxelSize,
+    float isoValue, float3 * samplePts, uint sampleLength)
+{
+    // calculate number of vertices need per voxel
+    classifyVoxel << <grid, threads >> > (voxelVerts, voxelOccupied, gridSize,
+        numVoxels, basePoint, voxelSize,
+        isoValue, samplePts, sampleLength);
+    getLastCudaError("classifyVoxel failed");
+}
+
+extern "C" void launch_compactVoxels(dim3 grid, dim3 threads, uint * compactedVoxelArray, uint * voxelOccupied, uint * voxelOccupiedScan, uint numVoxels)
+{
+    compactVoxels << <grid, threads >> > (compactedVoxelArray, voxelOccupied,
+        voxelOccupiedScan, numVoxels);
+    getLastCudaError("compactVoxels failed");
+}
+
+extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements)
+{
+    thrust::exclusive_scan(thrust::device_ptr<unsigned int>(input),
+        thrust::device_ptr<unsigned int>(input + numElements),
+        thrust::device_ptr<unsigned int>(output));
+}
+
+
 extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
-    float3 * samplePts, uint sampleLength, float3 * d_activeVerts)
+    float3 * samplePts, uint sampleLength)
 {
     extractIsosurface << <grid, threads >> > (result, compactedVoxelArray, numVertsScanned,
         gridSize, basePoint, voxelSize, isoValue, scale,

@@ -7,24 +7,22 @@
 #include <cuda_runtime.h>
 #include <vector_types.h>
 #include <vector_functions.h>
+#include <device_launch_parameters.h>
 
 #include <helper_cuda.h>
 #include <helper_functions.h>
-#include <device_launch_parameters.h>
 
 #include "MarchingCubesGPU.h"
 
 #include<time.h>
 
-extern "C" __declspec(dllexport)  void marchingcubesGPU(cfloat3 bP, cfloat3 vS,
+extern "C" __declspec(dllexport)  void computMC(cfloat3 bP, cfloat3 vS,
     int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, 
     int sampleCount, size_t& resultLength);
+extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
 extern "C" __declspec(dllexport)  void freeMemory(cfloat3 * a);
 
 
-//cfloat3* marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-//    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength);
-//
 //int main()
 //{
 //    ifstream inFile;
@@ -61,19 +59,19 @@ extern "C" __declspec(dllexport)  void freeMemory(cfloat3 * a);
 //    size_t resultLength = 0;
 //    cfloat3* result = marchingcubesGPU(bp, vS, xCount, yCount, zCount, ss, iso, samplePoints, sampleCount, resultLength);
 //
-//    ofstream outFile;
-//    outFile.open(outputPath);
-//    if (outFile.is_open())
-//    {
-//        for (size_t i = 0; i < num_resultVertices; i++)
-//        {
-//            outFile << result[i].x << '\t' << result[i].y << '\t' << result[i].z << endl;
-//        }
-//        outFile.close();
-//    }
+//    //ofstream outFile;
+//    //outFile.open(outputPath);
+//    //if (outFile.is_open())
+//    //{
+//    //    for (size_t i = 0; i < num_resultVertices; i++)
+//    //    {
+//    //        outFile << result[i].x << '\t' << result[i].y << '\t' << result[i].z << endl;
+//    //    }
+//    //    outFile.close();
+//    //}
 //}
 
-void marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength)
 {
 
@@ -97,14 +95,17 @@ void marchingcubesGPU(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount
 
     cleanup();
 
-    cfloat3* results = new cfloat3[num_resultVertices];
+    resultLength = (size_t)num_resultVertices;
+}
+void getResult(cfloat3* results)
+{
     for (int i = 0; i < num_resultVertices; i++)
     {
         results[i] = Convert(resultPts[i]);
     }
     delete[] resultPts;
-    resultLength = (size_t)num_resultVertices;
 }
+
 void freeMemory(cfloat3* a)
 {
     delete[] a;
@@ -168,7 +169,20 @@ void writeFile(string filename)
         outFile.close();
     }
 }
+void writeScan()
+{
+    ofstream outFile;
+    outFile.open("E:\\scanresult.txt");
+    if (outFile.is_open())
+    {
+        for (size_t i = 0; i < numVoxels; i++)
+        {
+            outFile << voxelOccupiedScan[i] << endl;
+        }
 
+        outFile.close();
+    }
+}
 void initMC()
 {
     clock_t start2 = clock();
@@ -207,11 +221,12 @@ void cleanup()
 
     checkCudaErrors(cudaFree(d_samplePts));
     delete[] samplePts;
+    delete[] voxelOccupiedScan;
 }
 void runComputeIsosurface()
 {
     clock_t start3 = clock();
-
+    #pragma region Classify all voxels
     int threads = 256;
     dim3 grid((numVoxels+threads -1) / threads, 1, 1);
 
@@ -226,21 +241,31 @@ void runComputeIsosurface()
     launch_classifyVoxel(grid, threads,
         d_voxelVerts, d_voxelOccupied, gridSize,
         numVoxels, basePoint, voxelSize, isoValue, d_samplePts, sampleLength);
-
+    #pragma endregion
     clock_t end3 = clock();
     cout << "launch_classifyVoxel: " << (double)(end3 - start3) / CLOCKS_PER_SEC * 1000 << endl;
 
     clock_t start4 = clock();
+    #pragma region Scan occupied voxels
     // after classifying voxels, we will get a lot of empty voxels.
     // in order to cull them, we have to use exclusive sum scan to get a new array
     // the last element in this new array plus the last element in the array before scan 
     // equals the number of active voxels
     exclusiveSumScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
 
+    //launch_scan(grid, threads,d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
+    #pragma endregion
     clock_t end4 = clock();
-    cout << "exclusiveSumScan: " << (double)(end4 - start4) / CLOCKS_PER_SEC * 1000 << endl;
+    cout << "exclusiveSumScan1: " << (double)(end4 - start4) / CLOCKS_PER_SEC * 1000 << endl;
 
-    clock_t start41 = clock();
+    //voxelOccupiedScan = new uint[numVoxels];
+
+    //checkCudaErrors(cudaMemcpy(voxelOccupiedScan,
+    //    d_voxelOccupiedScan, numVoxels * sizeof(uint),
+    //    cudaMemcpyDeviceToHost));
+    //writeScan();
+    
+    #pragma region Find the number of active voxels
     uint lastElement, lastScanElement;
     // only copy the last elements from two arrays on the device
     checkCudaErrors(cudaMemcpy((void*)&lastElement,
@@ -252,9 +277,7 @@ void runComputeIsosurface()
 
     // comput the number of active voxels
     num_activeVoxels = lastElement + lastScanElement;
-    clock_t end41 = clock();
-    cout << "Find_num_activeVoxels: " << (double)(end41 - start41) / CLOCKS_PER_SEC * 1000 << endl;
-
+    
     if (num_activeVoxels == 0)
     {
         // return if there are no full voxels
@@ -262,21 +285,22 @@ void runComputeIsosurface()
         return;
     }
 
-    clock_t start42 = clock();
+    #pragma endregion
+
+    #pragma region Compact voxels
     // compact voxel index array
     launch_compactVoxels(grid, threads, d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
-
-    clock_t end42 = clock();
-    cout << "launch_compactVoxels: " << (double)(end42 - start42) / CLOCKS_PER_SEC * 1000 << endl;
+    #pragma endregion
 
     clock_t start43 = clock();
+    #pragma region Scan the number of vertices each voxel has
     // compute the number of output vertices
     exclusiveSumScan(d_voxelVertsScan, d_voxelVerts, numVoxels);
-
+    #pragma endregion
     clock_t end43 = clock();
-    cout << "exclusiveSumScan: " << (double)(end43 - start43) / CLOCKS_PER_SEC * 1000 << endl;
+    cout << "exclusiveSumScan2: " << (double)(end43 - start43) / CLOCKS_PER_SEC * 1000 << endl;
 
-    clock_t start44 = clock();
+    #pragma region Find the number of sum vertices
     uint lastElement2, lastScanElement2;
     checkCudaErrors(cudaMemcpy((void*)&lastElement2,
         (void*)(d_voxelVerts + numVoxels - 1),
@@ -285,15 +309,13 @@ void runComputeIsosurface()
         (void*)(d_voxelVertsScan + numVoxels - 1),
         sizeof(uint), cudaMemcpyDeviceToHost));
     num_resultVertices = lastElement2 + lastScanElement2;
-    cout << num_activeVoxels << endl;
-
-    checkCudaErrors(cudaMalloc((void**)&(d_result), num_resultVertices * sizeof(float3)));
-
-    clock_t end44 = clock();
-    cout << "Find_num_resultVertices: " << (double)(end44 - start44) / CLOCKS_PER_SEC * 1000 << endl;
+    #pragma endregion
 
     clock_t start5 = clock();
-
+    #pragma region Generate isosurface
+    
+    checkCudaErrors(cudaMalloc((void**)&(d_result), num_resultVertices * sizeof(float3)));
+    
     dim3 grid2((num_activeVoxels + threads - 1) / threads, 1, 1);
 
     // get around maximum grid size of 65535 in each dimension
@@ -311,7 +333,7 @@ void runComputeIsosurface()
     checkCudaErrors(cudaMemcpy(resultPts,
         d_result, num_resultVertices * sizeof(float3),
         cudaMemcpyDeviceToHost));
-
+    #pragma endregion
     clock_t end5 = clock();
     cout << "launch_extractIsosurface: " << (double)(end5 - start5) / CLOCKS_PER_SEC * 1000 << endl;
 }

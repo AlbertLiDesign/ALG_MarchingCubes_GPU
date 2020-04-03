@@ -4,7 +4,6 @@
 #include <vector_functions.h>
 #include <SDKDDKVer.h>
 
-
 typedef unsigned int uint;
 typedef unsigned char uchar;
 
@@ -24,7 +23,7 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
 
 extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable);
 extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements);
-
+extern "C" void launch_scan(dim3 grid, dim3 threads, uint * d_input, uint * d_output, uint n);
 
 struct cfloat3
 {
@@ -82,6 +81,10 @@ uint* d_triTable = 0;
 
 // output
 float3* resultPts;
+
+//test
+uint* voxelOccupiedScan;
+uint* voxelOccupied;
 
 // forward declarations
 float3* loadFile(string filename);
