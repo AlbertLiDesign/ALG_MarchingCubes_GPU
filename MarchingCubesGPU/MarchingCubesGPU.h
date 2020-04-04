@@ -4,7 +4,7 @@
 #include <vector_functions.h>
 #include <SDKDDKVer.h>
 
-typedef unsigned int uint;
+typedef int uint;
 typedef unsigned char uchar;
 
 using namespace std;
@@ -22,8 +22,7 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * samplePts, uint sampleLength);
 
 extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable);
-extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements);
-extern "C" void launch_scan(dim3 grid, dim3 threads, uint * d_input, uint * d_output, uint n);
+extern "C" void exclusiveSumScan(uint* output, uint* input, uint numElements);
 
 struct cfloat3
 {

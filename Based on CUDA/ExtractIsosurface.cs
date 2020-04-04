@@ -48,7 +48,6 @@ namespace ALG_MarchingCubes.Based_on_CUDA
         public static extern void freeMemory(IntPtr a);
         public List<Point3d> runIsosurface()
         {
-            List<Point3d> pts = new List<Point3d>();
             int sampleCount = samplePoints.Count();
             cfloat3 bP = ConvertPtToFloat3(basePoint);
             cfloat3 vS = ConvertPtToFloat3(voxelSize);           
@@ -65,14 +64,15 @@ namespace ALG_MarchingCubes.Based_on_CUDA
             IntPtr result = Marshal.AllocHGlobal(size);
 
             getResult(result);
+            Point3d[] pts = new Point3d[(int)resultLength];
 
-            for (int i = 0; i < (int)resultLength; i++)
+            Parallel.For (0, (int)resultLength,i=>
             {
                 IntPtr pPointor = new IntPtr(result.ToInt64() + Marshal.SizeOf(typeof(cfloat3)) * i);
-                pts.Add(ConvertFloat3ToPt((cfloat3)Marshal.PtrToStructure(pPointor, typeof(cfloat3))));
-            }
+                pts[i] = ConvertFloat3ToPt((cfloat3)Marshal.PtrToStructure(pPointor, typeof(cfloat3)));
+            });
             Marshal.FreeHGlobal(result);
-            return pts;
+            return pts.ToList() ;
         }
 
         public cfloat3 ConvertPtToFloat3(Point3d p)

@@ -17,23 +17,6 @@ texture<uint, 1, cudaReadModeElementType> edgeTexture;
 texture<uint, 1, cudaReadModeElementType> faceTexture;
 texture<uint, 1, cudaReadModeElementType> vertexTexture;
 
-
-extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable)
-{
-    checkCudaErrors(cudaMalloc((void**)d_edgeTable, 256 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_edgeTable, (void*)edgeTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
-    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
-    checkCudaErrors(cudaBindTexture(0, edgeTexture, *d_edgeTable, channelDesc));
-
-    checkCudaErrors(cudaMalloc((void**)d_triTable, 256 * 16 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_triTable, (void*)triTable, 256 * 16 * sizeof(uint), cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaBindTexture(0, faceTexture, *d_triTable, channelDesc));
-
-    checkCudaErrors(cudaMalloc((void**)d_numVertsTable, 256 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_numVertsTable, (void*)numVertsTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaBindTexture(0, vertexTexture, *d_numVertsTable, channelDesc));
-}
-
 // compute values of each corner point
 __device__ float computeValue(float3* samplePts, float3 testP, uint sampleLength)
 {
@@ -50,8 +33,6 @@ __device__ float computeValue(float3* samplePts, float3 testP, uint sampleLength
     }
     return result;
 }
-
-
 // compute 3d index in the grid from 1d index
 __device__ uint3 calcGridPos(uint i, uint3 gridSize)
 {
@@ -130,7 +111,6 @@ __global__ void compactVoxels(uint* compactedVoxelArray, uint* voxelOccupied, ui
         compactedVoxelArray[voxelOccupiedScan[i]] = i;
     }
 }
-
 
 __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uint* numVertsScanned,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
@@ -247,31 +227,21 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     }
 }
 
-__global__ void scan(uint* d_in, uint* d_out, uint n)
+#pragma region pass methods
+extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable)
 {
-    extern __shared__ uint sdata[];
-    int i;
-    uint tid = threadIdx.x;
+    checkCudaErrors(cudaMalloc((void**)d_edgeTable, 256 * sizeof(uint)));
+    checkCudaErrors(cudaMemcpy((void*)*d_edgeTable, (void*)edgeTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
+    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
+    checkCudaErrors(cudaBindTexture(0, edgeTexture, *d_edgeTable, channelDesc));
 
-    sdata[tid] = d_in[tid];
+    checkCudaErrors(cudaMalloc((void**)d_triTable, 256 * 16 * sizeof(uint)));
+    checkCudaErrors(cudaMemcpy((void*)*d_triTable, (void*)triTable, 256 * 16 * sizeof(uint), cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaBindTexture(0, faceTexture, *d_triTable, channelDesc));
 
-    for (i = 1; i < n; i <<= 1)
-    {
-
-        if (tid >= i)
-        {
-            sdata[tid] += sdata[tid - i];
-        }
-        __syncthreads();
-    }
-    d_out[tid] = sdata[tid];
-    __syncthreads();
-}
-extern "C" void launch_scan(dim3 grid, dim3 threads, uint * d_input, uint * d_output, uint n)
-{
-    // calculate number of vertices need per voxel
-    scan << <grid, threads, sizeof(uint)* threads.x >> > (d_input, d_output, n);
-    getLastCudaError("scan failed");
+    checkCudaErrors(cudaMalloc((void**)d_numVertsTable, 256 * sizeof(uint)));
+    checkCudaErrors(cudaMemcpy((void*)*d_numVertsTable, (void*)numVertsTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaBindTexture(0, vertexTexture, *d_numVertsTable, channelDesc));
 }
 
 extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
@@ -292,13 +262,12 @@ extern "C" void launch_compactVoxels(dim3 grid, dim3 threads, uint * compactedVo
     getLastCudaError("compactVoxels failed");
 }
 
-extern "C" void exclusiveSumScan(unsigned int* output, unsigned int* input, unsigned int numElements)
+extern "C" void exclusiveSumScan(uint * output, uint * input, uint numElements)
 {
-    thrust::exclusive_scan(thrust::device_ptr<unsigned int>(input),
-        thrust::device_ptr<unsigned int>(input + numElements),
-        thrust::device_ptr<unsigned int>(output));
+    thrust::exclusive_scan(thrust::device_ptr<uint>(input),
+        thrust::device_ptr<uint>(input + numElements),
+        thrust::device_ptr<uint>(output));
 }
-
 
 extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
@@ -310,3 +279,4 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
         samplePts, sampleLength);
     getLastCudaError("extract Isosurface failed");
 }
+#pragma endregion

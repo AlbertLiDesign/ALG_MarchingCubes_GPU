@@ -20,56 +20,6 @@ extern "C" __declspec(dllexport)  void computMC(cfloat3 bP, cfloat3 vS,
     int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, 
     int sampleCount, size_t& resultLength);
 extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
-extern "C" __declspec(dllexport)  void freeMemory(cfloat3 * a);
-
-
-//int main()
-//{
-//    ifstream inFile;
-//
-//    inFile.open(filePath);
-//    cout << "pts.txt open scessful" << endl;
-//
-//    string s;
-//    getline(inFile, s);
-//    int sampleCount = stoi(s);
-//
-//    float bf1, bf2, bf3;
-//    inFile >> bf1 >> bf2 >> bf3;
-//    cfloat3 bp = Convert(make_float3(bf1, bf2, bf3));
-//
-//    float ss, iso;
-//    inFile >> ss >> iso;
-//    cfloat3 vS = Convert(make_float3(1, 1, 1));
-//
-//    int xCount, yCount, zCount;
-//    inFile >> xCount >> yCount >> zCount;
-//
-//    cfloat3* samplePoints = new cfloat3[sampleCount*sizeof(cfloat3)];
-//    int i = 0;
-//    float f1, f2, f3;
-//    while (inFile >> f1 >> f2 >> f3)
-//    {
-//        samplePoints[i] = Convert(make_float3(f1, f2, f3));
-//        i++;
-//    }
-//
-//    inFile.close();
-//
-//    size_t resultLength = 0;
-//    cfloat3* result = marchingcubesGPU(bp, vS, xCount, yCount, zCount, ss, iso, samplePoints, sampleCount, resultLength);
-//
-//    //ofstream outFile;
-//    //outFile.open(outputPath);
-//    //if (outFile.is_open())
-//    //{
-//    //    for (size_t i = 0; i < num_resultVertices; i++)
-//    //    {
-//    //        outFile << result[i].x << '\t' << result[i].y << '\t' << result[i].z << endl;
-//    //    }
-//    //    outFile.close();
-//    //}
-//}
 
 void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength)
@@ -106,10 +56,6 @@ void getResult(cfloat3* results)
     delete[] resultPts;
 }
 
-void freeMemory(cfloat3* a)
-{
-    delete[] a;
-}
 // Load arguments
 float3* loadFile(string filename)
 {
@@ -154,7 +100,6 @@ float3* loadFile(string filename)
         return samplePts;
     }
 }
-
 void writeFile(string filename)
 {
     ofstream outFile;
@@ -183,6 +128,7 @@ void writeScan()
         outFile.close();
     }
 }
+
 void initMC()
 {
     clock_t start2 = clock();
@@ -194,7 +140,7 @@ void initMC()
     cout << "allocateTextures: " << (double)(end2 - start2) / CLOCKS_PER_SEC * 1000 << endl;
 
     // allocate device memory
-    unsigned int memSize = sizeof(uint) * numVoxels;
+    uint memSize = sizeof(uint) * numVoxels;
     checkCudaErrors(cudaMalloc((void**)&d_voxelVerts, memSize));
     checkCudaErrors(cudaMalloc((void**)&d_voxelVertsScan, memSize));
     checkCudaErrors(cudaMalloc((void**)&d_voxelOccupied, memSize));
@@ -251,20 +197,11 @@ void runComputeIsosurface()
     // in order to cull them, we have to use exclusive sum scan to get a new array
     // the last element in this new array plus the last element in the array before scan 
     // equals the number of active voxels
-    exclusiveSumScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
-
-    //launch_scan(grid, threads,d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
+   exclusiveSumScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
     #pragma endregion
     clock_t end4 = clock();
     cout << "exclusiveSumScan1: " << (double)(end4 - start4) / CLOCKS_PER_SEC * 1000 << endl;
 
-    //voxelOccupiedScan = new uint[numVoxels];
-
-    //checkCudaErrors(cudaMemcpy(voxelOccupiedScan,
-    //    d_voxelOccupiedScan, numVoxels * sizeof(uint),
-    //    cudaMemcpyDeviceToHost));
-    //writeScan();
-    
     #pragma region Find the number of active voxels
     uint lastElement, lastScanElement;
     // only copy the last elements from two arrays on the device
@@ -284,7 +221,6 @@ void runComputeIsosurface()
         num_resultVertices = 0;
         return;
     }
-
     #pragma endregion
 
     #pragma region Compact voxels
