@@ -40,13 +40,13 @@ namespace ALG_MarchingCubes.Based_on_CUDA
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "computMC")]
         public static extern void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength);
+            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength, ref uint activeVoxels);
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "getResult")]
         public static extern void getResult(IntPtr result);
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "freeMemory")]
         public static extern void freeMemory(IntPtr a);
-        public List<Point3d> runIsosurface()
+        public List<Point3d> runIsosurface(ref int num_activeVoxels)
         {
             int sampleCount = samplePoints.Count();
             cfloat3 bP = ConvertPtToFloat3(basePoint);
@@ -57,9 +57,10 @@ namespace ALG_MarchingCubes.Based_on_CUDA
                 smaplePts[i] = ConvertPtToFloat3(samplePoints[i]);
             }
 
-            uint resultLength = 0;
-            computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
+            uint resultLength = 0, activeVoxels = 0;
+            computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength, ref activeVoxels);
 
+            num_activeVoxels = (int)activeVoxels;
             int size = Marshal.SizeOf(typeof(cfloat3)) * (int)resultLength;
             IntPtr result = Marshal.AllocHGlobal(size);
 

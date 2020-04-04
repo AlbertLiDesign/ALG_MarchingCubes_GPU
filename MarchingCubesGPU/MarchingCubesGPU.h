@@ -81,10 +81,6 @@ uint* d_triTable = 0;
 // output
 float3* resultPts;
 
-//test
-uint* voxelOccupiedScan;
-uint* voxelOccupied;
-
 // forward declarations
 float3* loadFile(string filename);
 void initMC();

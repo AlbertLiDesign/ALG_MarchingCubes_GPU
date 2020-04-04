@@ -74,7 +74,10 @@ namespace ALG_MarchingCubes
             #endregion
 
             sw.Restart();
-            List<Point3d> resultPts = isoSurface.runIsosurface();
+            int num_activeVoxels = 0, num_Voxels = xCount*yCount*zCount;
+            List<Point3d> resultPts = isoSurface.runIsosurface(ref num_activeVoxels);
+
+            this.Message = num_Voxels.ToString();
             sw.Stop();
             double tb = sw.Elapsed.TotalMilliseconds;
 

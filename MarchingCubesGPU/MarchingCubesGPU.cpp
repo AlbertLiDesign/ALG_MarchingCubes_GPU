@@ -18,11 +18,11 @@
 
 extern "C" __declspec(dllexport)  void computMC(cfloat3 bP, cfloat3 vS,
     int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, 
-    int sampleCount, size_t& resultLength);
+    int sampleCount, size_t& resultLength, size_t & activeVoxels);
 extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
 
 void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength)
+    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength, size_t& activeVoxels)
 {
 
     sampleLength = sampleCount;
@@ -46,6 +46,7 @@ void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     cleanup();
 
     resultLength = (size_t)num_resultVertices;
+    activeVoxels = (size_t)num_activeVoxels;
 }
 void getResult(cfloat3* results)
 {
@@ -114,20 +115,7 @@ void writeFile(string filename)
         outFile.close();
     }
 }
-void writeScan()
-{
-    ofstream outFile;
-    outFile.open("E:\\scanresult.txt");
-    if (outFile.is_open())
-    {
-        for (size_t i = 0; i < numVoxels; i++)
-        {
-            outFile << voxelOccupiedScan[i] << endl;
-        }
 
-        outFile.close();
-    }
-}
 
 void initMC()
 {
@@ -167,7 +155,6 @@ void cleanup()
 
     checkCudaErrors(cudaFree(d_samplePts));
     delete[] samplePts;
-    delete[] voxelOccupiedScan;
 }
 void runComputeIsosurface()
 {
