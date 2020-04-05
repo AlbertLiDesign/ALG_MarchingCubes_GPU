@@ -158,7 +158,6 @@ void cleanup()
 }
 void runComputeIsosurface()
 {
-    clock_t start3 = clock();
     #pragma region Classify all voxels
     int threads = 256;
     dim3 grid((numVoxels+threads -1) / threads, 1, 1);
@@ -175,10 +174,7 @@ void runComputeIsosurface()
         d_voxelVerts, d_voxelOccupied, gridSize,
         numVoxels, basePoint, voxelSize, isoValue, d_samplePts, sampleLength);
     #pragma endregion
-    clock_t end3 = clock();
-    cout << "launch_classifyVoxel: " << (double)(end3 - start3) / CLOCKS_PER_SEC * 1000 << endl;
 
-    clock_t start4 = clock();
     #pragma region Scan occupied voxels
     // after classifying voxels, we will get a lot of empty voxels.
     // in order to cull them, we have to use exclusive sum scan to get a new array
@@ -186,8 +182,6 @@ void runComputeIsosurface()
     // equals the number of active voxels
    exclusiveSumScan(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
     #pragma endregion
-    clock_t end4 = clock();
-    cout << "exclusiveSumScan1: " << (double)(end4 - start4) / CLOCKS_PER_SEC * 1000 << endl;
 
     #pragma region Find the number of active voxels
     uint lastElement, lastScanElement;
@@ -215,13 +209,10 @@ void runComputeIsosurface()
     launch_compactVoxels(grid, threads, d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
     #pragma endregion
 
-    clock_t start43 = clock();
     #pragma region Scan the number of vertices each voxel has
     // compute the number of output vertices
     exclusiveSumScan(d_voxelVertsScan, d_voxelVerts, numVoxels);
     #pragma endregion
-    clock_t end43 = clock();
-    cout << "exclusiveSumScan2: " << (double)(end43 - start43) / CLOCKS_PER_SEC * 1000 << endl;
 
     #pragma region Find the number of sum vertices
     uint lastElement2, lastScanElement2;
@@ -234,7 +225,6 @@ void runComputeIsosurface()
     num_resultVertices = lastElement2 + lastScanElement2;
     #pragma endregion
 
-    clock_t start5 = clock();
     #pragma region Generate isosurface
     
     checkCudaErrors(cudaMalloc((void**)&(d_result), num_resultVertices * sizeof(float3)));
@@ -257,8 +247,6 @@ void runComputeIsosurface()
         d_result, num_resultVertices * sizeof(float3),
         cudaMemcpyDeviceToHost));
     #pragma endregion
-    clock_t end5 = clock();
-    cout << "launch_extractIsosurface: " << (double)(end5 - start5) / CLOCKS_PER_SEC * 1000 << endl;
 }
 
 
