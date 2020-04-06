@@ -1,5 +1,3 @@
-# ALG_MarchingCubes_GPU
-
 ## Introduction
 
 ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper run on GPU. It provides two versions(C# and C++) to implement Marching Cubes on GPU, the C# version is based on [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and the C++ version is based on [CUDA v10.2](https://developer.nvidia.com/cuda-downloads). This project is an important learning experience for me, I hope it can be a parallel programming reference case to help GPU programming beginners and Grasshopper developers.
@@ -12,25 +10,21 @@ At present, its computational performance can still be optimized (e.g. 99% of co
 
 ### Alea GPU
 
-If you want to compile the c# version, you should install Alea GPU.  Alea GPU requires a CUDA-capable GPU with **compute capability 2.0** or higher. 
+To compile the c# version, you need to install [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/).  Alea GPU requires a CUDA-capable GPU with **compute capability 2.0** or higher. Alea GPU consists of several assemblies, tools and resources, organized in multiple [NuGet packages](http://www.nuget.org/profiles/quantalea). So you can install them directly through Visual Studio. 
 
-Alea GPU consists of several assemblies, tools and resources, organized in multiple [NuGet packages](http://www.nuget.org/profiles/quantalea).
+It is important to note that you also need to install **FSharp.Core** package and **CUDA v9.0** (CUDA v10.2 is not supported) before using Alea GPU in C#.
 
 If you want to learn more about Alea GPU, please check the web site [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)
 
-```
+![](https://albertlidesign.github.io/post-images/1586082600760.png)
 
-```
+### CUDA
 
 To compile the c++ version, you need to install [CUDA v10.2](https://developer.nvidia.com/cuda-downloads). 
 
 ## Performance
 
-
-
-If you want to learn more about Alea GPU, please check the web site [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)
-
-
+![](https://albertlidesign.github.io/post-images/1586082652606.png)
 
 ## Reference
 
