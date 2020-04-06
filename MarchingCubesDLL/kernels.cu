@@ -13,7 +13,6 @@
 #include "tables.h"
 
 // textures containing look-up tables
-texture<uint, 1, cudaReadModeElementType> edgeTexture;
 texture<uint, 1, cudaReadModeElementType> faceTexture;
 texture<uint, 1, cudaReadModeElementType> vertexTexture;
 
@@ -228,12 +227,9 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
 }
 
 #pragma region pass methods
-extern "C" void allocateTextures(uint * *d_edgeTable, uint * *d_triTable, uint * *d_numVertsTable)
+extern "C" void allocateTextures(uint * *d_triTable, uint * *d_numVertsTable)
 {
-    checkCudaErrors(cudaMalloc((void**)d_edgeTable, 256 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_edgeTable, (void*)edgeTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
-    checkCudaErrors(cudaBindTexture(0, edgeTexture, *d_edgeTable, channelDesc));
 
     checkCudaErrors(cudaMalloc((void**)d_triTable, 256 * 16 * sizeof(uint)));
     checkCudaErrors(cudaMemcpy((void*)*d_triTable, (void*)triTable, 256 * 16 * sizeof(uint), cudaMemcpyHostToDevice));

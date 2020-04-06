@@ -29,7 +29,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
@@ -41,9 +41,6 @@
     </Reference>
     <Reference Include="Alea.CudaToolkit, Version=1.0.9.0, Culture=neutral, PublicKeyToken=ba52afc3c2e933d6, processorArchitecture=MSIL">
       <HintPath>packages\Alea.CudaToolkit.1.0.9\lib\net45\Alea.CudaToolkit.dll</HintPath>
-    </Reference>
-    <Reference Include="Alea.Fody">
-      <HintPath>packages\Alea.Fody.3.0.4\Alea.Fody.dll</HintPath>
     </Reference>
     <Reference Include="Alea.IL, Version=3.0.0.0, Culture=neutral, PublicKeyToken=ba52afc3c2e933d6, processorArchitecture=MSIL">
       <HintPath>packages\Alea.3.0.4\lib\net45\Alea.IL.dll</HintPath>
@@ -86,8 +83,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Based on CUDA\ExtractIsosurface.cs" />
-    <Compile Include="Based on CUDA\Isosurface.cs" />
     <Compile Include="Basic Functions\BasicFunctions.cs" />
     <Compile Include="Based on Alea GPU\ComputeVoxels.cs" />
     <Compile Include="Based on Alea GPU\ExtractIsoSurface.cs" />
@@ -105,7 +100,6 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>Copy "$(TargetPath)" "$(TargetDir)$(ProjectName).gha"

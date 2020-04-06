@@ -39,14 +39,14 @@ namespace ALG_MarchingCubes.Based_on_CUDA
         }
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "computMC")]
-        public static extern void computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength, ref uint activeVoxels);
+        public static extern bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
+            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength);
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "getResult")]
         public static extern void getResult(IntPtr result);
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "freeMemory")]
         public static extern void freeMemory(IntPtr a);
-        public List<Point3d> runIsosurface(ref int num_activeVoxels)
+        public bool runIsosurface(ref List<Point3d> vertices, ref int num_activeVoxels)
         {
             int sampleCount = samplePoints.Count();
             cfloat3 bP = ConvertPtToFloat3(basePoint);
@@ -57,23 +57,31 @@ namespace ALG_MarchingCubes.Based_on_CUDA
                 smaplePts[i] = ConvertPtToFloat3(samplePoints[i]);
             }
 
-            uint resultLength = 0, activeVoxels = 0;
-            computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength, ref activeVoxels);
+            uint resultLength = 0;
+            bool successful = computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
 
-            num_activeVoxels = (int)activeVoxels;
-            int size = Marshal.SizeOf(typeof(cfloat3)) * (int)resultLength;
-            IntPtr result = Marshal.AllocHGlobal(size);
-
-            getResult(result);
-            Point3d[] pts = new Point3d[(int)resultLength];
-
-            Parallel.For (0, (int)resultLength,i=>
+            if (successful == false)
             {
-                IntPtr pPointor = new IntPtr(result.ToInt64() + Marshal.SizeOf(typeof(cfloat3)) * i);
-                pts[i] = ConvertFloat3ToPt((cfloat3)Marshal.PtrToStructure(pPointor, typeof(cfloat3)));
-            });
-            Marshal.FreeHGlobal(result);
-            return pts.ToList() ;
+                return successful;
+            }
+            else
+            {
+                int size = Marshal.SizeOf(typeof(cfloat3)) * (int)resultLength;
+                IntPtr result = Marshal.AllocHGlobal(size);
+
+                getResult(result);
+                Point3d[] pts = new Point3d[(int)resultLength];
+
+                Parallel.For(0, (int)resultLength, i =>
+                {
+                    IntPtr pPointor = new IntPtr(result.ToInt64() + Marshal.SizeOf(typeof(cfloat3)) * i);
+                    pts[i] = ConvertFloat3ToPt((cfloat3)Marshal.PtrToStructure(pPointor, typeof(cfloat3)));
+                });
+                Marshal.FreeHGlobal(result);
+                vertices = pts.ToList();
+                return successful;
+
+            }
         }
 
         public cfloat3 ConvertPtToFloat3(Point3d p)

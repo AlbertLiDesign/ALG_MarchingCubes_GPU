@@ -1,4 +1,4 @@
-# ALG_MarchingCubes_GPU
+# ALG_MarchingCubes_GPU v1.0
 
 ## Introduction
 
@@ -12,21 +12,21 @@ At present, its computational efficiency can still be optimized (e.g. 99% of com
 
 ### Alea GPU
 
-If you want to compile the c# version, you should install Alea GPU.  Alea GPU requires a CUDA-capable GPU with **compute capability 2.0** or higher. 
+If you want to compile the c# version, you should install [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/).  Alea GPU requires a CUDA-capable GPU with **compute capability 2.0** or higher. 
 
-Alea GPU consists of several assemblies, tools and resources, organized in multiple [NuGet packages](http://www.nuget.org/profiles/quantalea).
-
-The package [Alea](http://www.nuget.org/packages/Alea) installs the Alea GPU JIT compiler that translates IL code or F# quotations to GPU code.
-
-```
-
-```
-
-
-
-
+Alea GPU consists of several assemblies, tools and resources, organized in multiple [NuGet packages](http://www.nuget.org/profiles/quantalea). So you can install them directly through Visual Studio. It is important to note that you need to install **FSharp.Core** package and **CUDA v9.0** (CUDA v10.2 is not supported) before using Alea GPU in C#.
 
 If you want to learn more about Alea GPU, please check the web site [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)
+
+### CUDA
+
+If you want to compile the c++ version, you should install [CUDA v10.2](https://developer.nvidia.com/cuda-downloads). 
+
+
+
+## Performance
+
+The GPU device I used was RTX 2060, which took about 525.89ms to extract isosurface from 7524 sample points. It calculated the values of 8 corners of 1295029 voxels and compares them with specified Isovalues. At present, 99.6% of computing time was spent on the memory copy. The following image is a performance analysis report using NIVIDIA Visual Profiler.
 
 
 

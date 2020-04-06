@@ -15,20 +15,19 @@ namespace ALG_MarchingCubes
     public class ALG_Isosurface : GH_Component
     {
         public ALG_Isosurface()
-          : base("Isosurface", "Isosurface", "Compute voxels from points.", "ALG", "MarchingCubes") { }
+          : base("Isosurface Extraction", "Isosurface", "Extract isosurface from points.", "Mesh", "Triangulation") { }
         public override GH_Exposure Exposure => GH_Exposure.primary;
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddGeometryParameter("Geometries", "G", "Geometries", GH_ParamAccess.list);
-            pManager.AddNumberParameter("BoundaryRatio", "B", "BoundaryRatio", GH_ParamAccess.item, 2);
-            pManager.AddNumberParameter("Scale", "S", "Scale", GH_ParamAccess.item, 1);
-            pManager.AddNumberParameter("isoValue", "ISO", "isoValue", GH_ParamAccess.item, 5.0);
+            pManager.AddNumberParameter("Boundary", "B", "The scale of the boundingbox's boundary.", GH_ParamAccess.item, 1.1);
+            pManager.AddNumberParameter("VoxelSize", "S", "Voxel Size", GH_ParamAccess.item, 1.0);
+            pManager.AddNumberParameter("Isovalue", "Iso", "Isovalue.", GH_ParamAccess.item);
         }
 
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("Mesh", "P", "The boundingbox Boundary of input geometries.", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Time", "T", "Time", GH_ParamAccess.list);
+            pManager.AddMeshParameter("Mesh", "M", "Extract isosurface.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -38,16 +37,14 @@ namespace ALG_MarchingCubes
             double scale = 1.0;
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
-            List<double> time = new List<double>();
 
             DA.GetDataList("Geometries", geos);
-            DA.GetData("BoundaryRatio", ref boundaryRatio);
-            DA.GetData("Scale", ref scale);
-            DA.GetData("isoValue", ref isovalue);
+            DA.GetData("Boundary", ref boundaryRatio);
+            DA.GetData("VoxelSize", ref scale);
+            DA.GetData("Isovalue", ref isovalue);
             #endregion
 
             #region initialization
-            Stopwatch sw = new Stopwatch();
             Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
 
             Interval xD = box1.X;
@@ -73,40 +70,31 @@ namespace ALG_MarchingCubes
             var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, voxelS, (float)scale, (float)isovalue, samplePoints);
             #endregion
 
-            sw.Restart();
             int num_activeVoxels = 0, num_Voxels = xCount*yCount*zCount;
-            List<Point3d> resultPts = isoSurface.runIsosurface(ref num_activeVoxels);
+            List<Point3d> resultPts = new List<Point3d>();
+            bool successful = isoSurface.runIsosurface(ref resultPts,  ref num_activeVoxels);
 
+            if (successful == false)
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "No eligible isosurface can be extracted, please change isovalue.");
+                return;
+            }
             this.Message = num_Voxels.ToString();
-            sw.Stop();
-            double tb = sw.Elapsed.TotalMilliseconds;
 
             #region extract the mesh from result vertices
-            sw.Restart();
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
-            sw.Stop();
-            double ta = sw.Elapsed.TotalMilliseconds;
-
-            sw.Restart();
-                mesh.Faces.CullDegenerateFaces();
-                mesh.FaceNormals.ComputeFaceNormals();
-                mesh.Normals.ComputeNormals();
-            sw.Stop();
-            double tc = sw.Elapsed.TotalMilliseconds;
+            mesh.Faces.CullDegenerateFaces();
+            mesh.FaceNormals.ComputeFaceNormals();
+            mesh.Normals.ComputeNormals();
             #endregion
 
-            time.Add(ta);
-            time.Add(tb);
-            time.Add(tc);
-
             DA.SetData("Mesh", mesh);
-            DA.SetDataList("Time", time);
         }
 
         protected override Bitmap Icon => null;
         public override Guid ComponentGuid
         {
-            get { return new Guid("{0F2A4148-B516-453E-A589-4FD9BFD13D42}"); }
+            get { return new Guid("{04728D21-346C-4D33-B0DF-0BC34E99CC82}"); }
         }
     }
 }
