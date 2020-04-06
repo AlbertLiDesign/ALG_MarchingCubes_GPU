@@ -24,8 +24,6 @@ To compile the c++ version, you need to install [CUDA v10.2](https://developer.n
 
 ## Performance
 
-The GPU device I use is RTX 2060, which take about 525.89ms to extract isosurface from 7524 sample points. During the execution of the program, the computer calculated the values of 8 corners of 1295029 voxels and compares them with specified Isovalues. The following image is a performance analysis report using NIVIDIA Visual Profiler. It's worth noting that 99.6% of computing time is spent on the memory copy in this program.
-
 ![](https://albertlidesign.github.io/post-images/1586082652606.png)
 
 ## Reference
