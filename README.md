@@ -1,6 +1,6 @@
 ## Introduction
 
-ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper using Marching Cubes algorithm on GPU. It provides two versions——C# ([Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and C++ ([CUDA v10.2](https://developer.nvidia.com/cuda-downloads)), to implement Marching Cubes on GPU. The development of this project is an important learning experience for me. I hope it can be a parallel programming reference case which can help GPU programming beginners and Grasshopper developers.
+ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper using [Marching Cubes algorithm](https://en.wikipedia.org/wiki/Marching_cubes) on GPU. It provides two versions——C# ([Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and C++ ([CUDA v10.2](https://developer.nvidia.com/cuda-downloads)), to implement Marching Cubes on GPU. The development of this project is an important learning experience for me. I hope it can be a parallel programming reference case which can help GPU programming beginners and Grasshopper developers.
 
 At present, its computational performance can still be optimized (e.g. 99% of computing time is spent on the memory copy). I will continue to improve it in my future work.
 
@@ -38,7 +38,10 @@ To compile the c++ version, you need to install [CUDA v10.2](https://developer.n
 
 [5] Marching Cubes implementation using OpenCL and OpenGL：https://www.eriksmistad.no/marching-cubes-implementation-using-opencl-and-opengl/
 
-[6] Samples for CUDA Developers which demonstrates features in CUDA Toolkit: https://github.com/NVIDIA/cuda-samples
+[6] A sample extracts a geometric isosurface from a volume dataset using the marching cubes algorithm.: https://github.com/tpn/cuda-samples/tree/master/v10.2/2_Graphics/marchingCubes
 
 [7] Samples and C# GPU Programming tutorials for Alea GPU Developers: http://www.aleagpu.com/release/3_0_4/doc/
 
+[8] The introduction of marching cubes: http://www.cs.carleton.edu/cs_comps/0405/shape/marching_cubes.html
+
+[9] The introduction of marching cubes: https://medium.com/zeg-ai/voxel-to-mesh-conversion-marching-cube-algorithm-43dbb0801359

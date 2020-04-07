@@ -43,7 +43,7 @@ bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     initMC();
 
 #pragma region Classify all voxels
-    int threads = 256;
+    int threads = 512;
     dim3 grid((numVoxels + threads - 1) / threads, 1, 1);
 
     // get around maximum grid size of 65535 in each dimension
@@ -213,14 +213,6 @@ void writeFile(string filename)
 
 void initMC()
 {
-    clock_t start2 = clock();
-
-    // allocate textures
-    allocateTextures(&d_triTable, &d_numVertsTable);
-
-    clock_t end2 = clock();
-    cout << "allocateTextures: " << (double)(end2 - start2) / CLOCKS_PER_SEC * 1000 << endl;
-
     // allocate device memory
     uint memSize = sizeof(uint) * numVoxels;
     checkCudaErrors(cudaMalloc((void**)&d_voxelVertsScan, memSize));

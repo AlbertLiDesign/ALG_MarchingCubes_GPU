@@ -12,10 +12,6 @@
 
 #include "tables.h"
 
-// textures containing look-up tables
-texture<uint, 1, cudaReadModeElementType> faceTexture;
-texture<uint, 1, cudaReadModeElementType> vertexTexture;
-
 // compute values of each corner point
 __device__ float computeValue(float3* samplePts, float3 testP, uint sampleLength)
 {
@@ -65,29 +61,28 @@ __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridS
     p.y = basePoint.y + gridPos.y * voxelSize.y;
     p.z = basePoint.z + gridPos.z * voxelSize.z;
 
-    float field[8];
-    field[0] = computeValue(samplePts, p, sampleLength);
-    field[1] = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, 0 + p.z), sampleLength);
-    field[2] = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    field[3] = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    field[4] = computeValue(samplePts, make_float3(0 + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    field[5] = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    field[6] = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
-    field[7] = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
+    float field0 = computeValue(samplePts, p, sampleLength);
+    float field1 = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, 0 + p.z), sampleLength);
+    float field2 = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
+    float field3 = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
+    float field4 = computeValue(samplePts, make_float3(0 + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
+    float field5 = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
+    float field6 = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
+    float field7 = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
 
     // calculate flag indicating if each vertex is inside or outside isosurface
     uint cubeindex;
-    cubeindex = uint(field[0] < isoValue);
-    cubeindex += uint(field[1] < isoValue) * 2;
-    cubeindex += uint(field[2] < isoValue) * 4;
-    cubeindex += uint(field[3] < isoValue) * 8;
-    cubeindex += uint(field[4] < isoValue) * 16;
-    cubeindex += uint(field[5] < isoValue) * 32;
-    cubeindex += uint(field[6] < isoValue) * 64;
-    cubeindex += uint(field[7] < isoValue) * 128;
+    cubeindex = uint(field0 < isoValue);
+    cubeindex += uint(field1 < isoValue) * 2;
+    cubeindex += uint(field2 < isoValue) * 4;
+    cubeindex += uint(field3 < isoValue) * 8;
+    cubeindex += uint(field4 < isoValue) * 16;
+    cubeindex += uint(field5 < isoValue) * 32;
+    cubeindex += uint(field6 < isoValue) * 64;
+    cubeindex += uint(field7 < isoValue) * 128;
 
     // read number of vertices from texture
-    uint numVerts = tex1Dfetch(vertexTexture, cubeindex);
+    uint numVerts = numVertsTable[cubeindex];
 
     if (i < numVoxels)
     {
@@ -214,12 +209,12 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     vertlist[11].z = basePoint.z + (gridPos.z + 0.0f + offsetV[11] * 1.0f) * scale;
 
     // read number of vertices from texture
-    uint numVerts = tex1Dfetch(vertexTexture, cubeindex);
+    uint numVerts = numVertsTable[cubeindex];
 
     for (int j = 0; j < numVerts; j++)
     {
         //find out which edge intersects the isosurface
-        uint edge = tex1Dfetch(faceTexture, cubeindex * 16 + j);
+        uint edge = triTable[cubeindex * 16 + j];
         uint index = numVertsScanned[compactedVoxelArray[i]] + j;
 
         result[index] = vertlist[edge];
@@ -227,18 +222,7 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
 }
 
 #pragma region pass methods
-extern "C" void allocateTextures(uint * *d_triTable, uint * *d_numVertsTable)
-{
-    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
-    checkCudaErrors(cudaMalloc((void**)d_triTable, 256 * 16 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_triTable, (void*)triTable, 256 * 16 * sizeof(uint), cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaBindTexture(0, faceTexture, *d_triTable, channelDesc));
-
-    checkCudaErrors(cudaMalloc((void**)d_numVertsTable, 256 * sizeof(uint)));
-    checkCudaErrors(cudaMemcpy((void*)*d_numVertsTable, (void*)numVertsTable, 256 * sizeof(uint), cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaBindTexture(0, vertexTexture, *d_numVertsTable, channelDesc));
-}
 
 extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
     uint numVoxels, float3 basePoint, float3 voxelSize,

@@ -28,6 +28,7 @@ namespace ALG_MarchingCubes
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddMeshParameter("Mesh", "M", "Extract isosurface.", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -37,6 +38,8 @@ namespace ALG_MarchingCubes
             double scale = 1.0;
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
+            List<double> time = new List<double>();
+            Stopwatch sw = new Stopwatch();
 
             DA.GetDataList("Point", samplePts);
             DA.GetData("Boundary", ref boundaryRatio);
@@ -69,6 +72,7 @@ namespace ALG_MarchingCubes
             var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, voxelS, (float)scale, (float)isovalue, samplePts);
             #endregion
 
+            sw.Start();
             int num_activeVoxels = 0, num_Voxels = xCount*yCount*zCount;
             List<Point3d> resultPts = new List<Point3d>();
             bool successful = isoSurface.runIsosurface(ref resultPts,  ref num_activeVoxels);
@@ -79,14 +83,24 @@ namespace ALG_MarchingCubes
                 return;
             }
             this.Message = num_Voxels.ToString();
-
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
             // extract the mesh from result vertices
+
+            sw.Restart();
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
-            mesh.Faces.CullDegenerateFaces();
+            //mesh.Faces.CullDegenerateFaces();
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
+            
+            sw.Stop();
+            double tc = sw.Elapsed.TotalMilliseconds;
+
+            time.Add(tb);
+            time.Add(tc);
 
             DA.SetData("Mesh", mesh);
+            DA.SetDataList("Time", time);
         }
 
         protected override Bitmap Icon => null;
