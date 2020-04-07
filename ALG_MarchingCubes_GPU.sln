@@ -9,11 +9,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MarchingCubesDLL", "Marchin
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "..\ConsoleApplication1\ConsoleApplication1.vcxproj", "{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{12425E32-A0B6-443E-851C-4EA1317518E2}"
-	ProjectSection(SolutionItems) = preProject
-		..\MyResearch\MarchingCubes\Alea GPU Installation.png = ..\MyResearch\MarchingCubes\Alea GPU Installation.png
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ALG_MarchingCubes_CUDA", "ALG_MarchingCubes_CUDA\ALG_MarchingCubes_CUDA.csproj", "{84FA415F-6F63-4EFE-A1EF-31593631EA97}"
 EndProject
 Global

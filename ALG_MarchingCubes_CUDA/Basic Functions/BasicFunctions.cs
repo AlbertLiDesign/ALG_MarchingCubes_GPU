@@ -32,17 +32,19 @@ namespace ALG_MarchingCubes
             return lines;
         }
         //构建用于映射的Box
-        public static Box CreateUnionBBoxFromGeometry(List<IGH_GeometricGoo> geos, double scale)
+        public static Box CreateUnionBBoxFromGeometry(List<Point3d> pts, double scale)
         {
+
             Plane worldXY = Plane.WorldXY;
             Transform xform = Transform.ChangeBasis(Plane.WorldXY, worldXY);
             BoundingBox empty = BoundingBox.Empty;
-            int num = geos.Count - 1;
+            int num = pts.Count - 1;
             for (int i = 0; i <= num; i++)
             {
-                if (geos[i] != null)
+                if (pts[i] != null)
                 {
-                    BoundingBox boundingBox = geos[i].GetBoundingBox(xform);
+                    GH_Point ghp = new GH_Point(pts[i]);
+                    BoundingBox boundingBox = ghp.GetBoundingBox(xform);
                     empty.Union(boundingBox);
                 }
             }
@@ -132,10 +134,10 @@ namespace ALG_MarchingCubes
 
             MeshFace[] mfs = new MeshFace[FCount];
             Parallel.For(0, FCount, i =>
-           {
+            {
                MeshFace mf = new MeshFace(i * 3, i * 3 + 1, i * 3 + 2);
                mfs[i] = mf;
-           });
+            });
             mesh.Faces.AddFaces(mfs);
             return mesh;
         }

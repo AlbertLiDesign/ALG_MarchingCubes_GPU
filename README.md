@@ -1,8 +1,8 @@
 ## Introduction
 
-ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper run on GPU. It provides two versions(C# and C++) to implement Marching Cubes on GPU, the C# version is based on [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and the C++ version is based on [CUDA v10.2](https://developer.nvidia.com/cuda-downloads). This project is an important learning experience for me, I hope it can be a parallel programming reference case to help GPU programming beginners and Grasshopper developers.
+ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper using Marching Cubes algorithm on GPU. It provides two versions——C# ([Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and C++ ([CUDA v10.2](https://developer.nvidia.com/cuda-downloads)), to implement Marching Cubes on GPU. The development of this project is an important learning experience for me. I hope it can be a parallel programming reference case which can help GPU programming beginners and Grasshopper developers.
 
-At present, its computational performance can still be optimized (e.g. 99% of computing time is spent on the memory copy), I will continue to improve it in the future work.
+At present, its computational performance can still be optimized (e.g. 99% of computing time is spent on the memory copy). I will continue to improve it in my future work.
 
 ![](https://albertlidesign.github.io/post-images/1586082938627.png)
 

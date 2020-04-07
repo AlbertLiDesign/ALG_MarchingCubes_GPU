@@ -15,11 +15,11 @@ namespace ALG_MarchingCubes
     public class ALG_Isosurface : GH_Component
     {
         public ALG_Isosurface()
-          : base("Isosurface Extraction", "Isosurface", "Extract isosurface from points.", "Mesh", "Triangulation") { }
+          : base("Isosurface Extraction", "Isosurface", "Extract isosurface from points using marching cubes algorithm on GPU.", "Mesh", "Triangulation") { }
         public override GH_Exposure Exposure => GH_Exposure.primary;
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
-            pManager.AddGeometryParameter("Geometries", "G", "Geometries", GH_ParamAccess.list);
+            pManager.AddPointParameter("Point", "P", "Sample points.", GH_ParamAccess.list);
             pManager.AddNumberParameter("Boundary", "B", "The scale of the boundingbox's boundary.", GH_ParamAccess.item, 1.1);
             pManager.AddNumberParameter("VoxelSize", "S", "Voxel Size", GH_ParamAccess.item, 1.0);
             pManager.AddNumberParameter("Isovalue", "Iso", "Isovalue.", GH_ParamAccess.item);
@@ -33,19 +33,19 @@ namespace ALG_MarchingCubes
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             #region input parameters
-            List<IGH_GeometricGoo> geos = new List<IGH_GeometricGoo>();
+            List<Point3d> samplePts = new List<Point3d>();
             double scale = 1.0;
             double boundaryRatio = 2.0;
             double isovalue = 5.0;
 
-            DA.GetDataList("Geometries", geos);
+            DA.GetDataList("Point", samplePts);
             DA.GetData("Boundary", ref boundaryRatio);
             DA.GetData("VoxelSize", ref scale);
             DA.GetData("Isovalue", ref isovalue);
             #endregion
 
             #region initialization
-            Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(geos, boundaryRatio);
+            Box box1 = BasicFunctions.CreateUnionBBoxFromGeometry(samplePts, boundaryRatio);
 
             Interval xD = box1.X;
             Interval yD = box1.Y;
@@ -64,10 +64,9 @@ namespace ALG_MarchingCubes
             }
             Point3d baseP = a[b.IndexOf(b.Min())];
 
-            List<Point3d> samplePoints = BasicFunctions.ConvertGeosToPoints(geos);
             Point3d voxelS = new Point3d(scale, scale, scale);
 
-            var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, voxelS, (float)scale, (float)isovalue, samplePoints);
+            var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, voxelS, (float)scale, (float)isovalue, samplePts);
             #endregion
 
             int num_activeVoxels = 0, num_Voxels = xCount*yCount*zCount;
@@ -81,12 +80,11 @@ namespace ALG_MarchingCubes
             }
             this.Message = num_Voxels.ToString();
 
-            #region extract the mesh from result vertices
+            // extract the mesh from result vertices
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
             mesh.Faces.CullDegenerateFaces();
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
-            #endregion
 
             DA.SetData("Mesh", mesh);
         }
