@@ -21,7 +21,7 @@ extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
     float3 * samplePts, uint sampleLength);
 
-extern "C" void exclusiveSumScan(uint* output, uint* input, uint numElements);
+extern "C" void exclusiveSumScan(uint * output, uint * input, uint numElements);
 
 struct cfloat3
 {

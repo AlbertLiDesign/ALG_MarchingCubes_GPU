@@ -1,8 +1,9 @@
-﻿#include <stdlib.h>
+﻿
 # include<iostream>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include<stdlib.h>
 
 #include <cuda_runtime.h>
 #include <vector_types.h>
@@ -17,8 +18,8 @@
 #include<time.h>
 
 extern "C" __declspec(dllexport)  bool computMC(cfloat3 bP, cfloat3 vS,
-    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints, 
-    int sampleCount, size_t& resultLength);
+    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints,
+    int sampleCount, size_t & resultLength);
 extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
 
 bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
@@ -199,13 +200,13 @@ void writeFile(string filename)
 {
     ofstream outFile;
     outFile.open(filename);
-    if(outFile.is_open())
+    if (outFile.is_open())
     {
         for (size_t i = 0; i < num_resultVertices; i++)
         {
             outFile << resultPts[i].x << '\t' << resultPts[i].y << '\t' << resultPts[i].z << endl;
         }
-        
+
         outFile.close();
     }
 }

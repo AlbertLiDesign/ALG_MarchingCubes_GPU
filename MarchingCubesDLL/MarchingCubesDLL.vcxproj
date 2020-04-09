@@ -189,16 +189,16 @@ nvrtc.lib
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\ALG_MarchingCubes\MarchingCubesGPU\MarchingCubesGPU.h" />
+    <ClInclude Include="MarchingCubesGPU.h" />
     <ClInclude Include="tables.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\ALG_MarchingCubes\MarchingCubesGPU\MarchingCubesGPU.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="kernels.cu">
       <FileType>Document</FileType>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="MarchingCubesGPU.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,13 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29609.76
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ALG_MarchingCubes_Alea", "ALG_MarchingCubes_Alea.csproj", "{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MarchingCubesDLL", "MarchingCubesDLL\MarchingCubesDLL.vcxproj", "{BFD7267A-1408-48AC-B396-D4ED9D56829C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "..\ConsoleApplication1\ConsoleApplication1.vcxproj", "{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ALG_MarchingCubes_CUDA", "ALG_MarchingCubes_CUDA\ALG_MarchingCubes_CUDA.csproj", "{84FA415F-6F63-4EFE-A1EF-31593631EA97}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ALG_MarchingCubes", "ALG_MarchingCubes_CUDA\ALG_MarchingCubes.csproj", "{84FA415F-6F63-4EFE-A1EF-31593631EA97}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,18 +17,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|x64.Build.0 = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Debug|x86.Build.0 = Debug|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|x64.ActiveCfg = Release|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|x64.Build.0 = Release|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|x86.ActiveCfg = Release|Any CPU
-		{77D0B7BD-B9B4-4974-B1D7-158AA60159BA}.Release|x86.Build.0 = Release|Any CPU
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Debug|Any CPU.ActiveCfg = Debug|Win32
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Debug|x64.ActiveCfg = Debug|x64
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Debug|x64.Build.0 = Debug|x64
@@ -43,16 +27,6 @@ Global
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Release|x64.Build.0 = Release|x64
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Release|x86.ActiveCfg = Release|Win32
 		{BFD7267A-1408-48AC-B396-D4ED9D56829C}.Release|x86.Build.0 = Release|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Debug|x64.ActiveCfg = Debug|x64
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Debug|x64.Build.0 = Debug|x64
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Debug|x86.ActiveCfg = Debug|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Debug|x86.Build.0 = Debug|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Release|Any CPU.ActiveCfg = Release|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Release|x64.ActiveCfg = Release|x64
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Release|x64.Build.0 = Release|x64
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Release|x86.ActiveCfg = Release|Win32
-		{14027F38-E8B4-47E3-8D2B-FD7ADD16D1E2}.Release|x86.Build.0 = Release|Win32
 		{84FA415F-6F63-4EFE-A1EF-31593631EA97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{84FA415F-6F63-4EFE-A1EF-31593631EA97}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{84FA415F-6F63-4EFE-A1EF-31593631EA97}.Debug|x64.ActiveCfg = Debug|Any CPU
