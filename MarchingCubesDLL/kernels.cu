@@ -12,21 +12,25 @@
 
 #include "tables.h"
 
+
 // compute values of each corner point
-__device__ float computeValue(float3* samplePts, float3 testP, uint sampleLength)
+__device__ float computeValue(float x, float y, float z)
 {
-    float result = 0.0f;
-    float Dx, Dy, Dz;
+    return cos(x) * sin(y) + cos(y) * sin(z) + cos(z) * sin(x);
+}
+__device__ float computeValue(float3 p)
+{
+    return computeValue(p.x,p.y,p.z);
+}
+__device__ float4 computeValue4(float3 p)
+{
+    float v = computeValue(p.x, p.y, p.z);
+    const float d = 0.001f;
+    float dx = computeValue(p.x + d, p.y, p.z) - v;
+    float dy = computeValue(p.x, p.y + d, p.z) - v;
+    float dz = computeValue(p.x, p.y, p.z + d) - v;
 
-    for (int j = 0; j < sampleLength; j++)
-    {
-        Dx = testP.x - samplePts[j].x;
-        Dy = testP.y - samplePts[j].y;
-        Dz = testP.z - samplePts[j].z;
-
-        result += 1 / (Dx * Dx + Dy * Dy + Dz * Dz);
-    }
-    return result;
+    return make_float4(dx, dy, dz, v);
 }
 // compute 3d index in the grid from 1d index
 __device__ uint3 calcGridPos(uint i, uint3 gridSize)
@@ -38,18 +42,16 @@ __device__ uint3 calcGridPos(uint i, uint3 gridSize)
     gridPos.x = i % (gridSize.x * gridSize.y) % gridSize.x;
     return gridPos;
 }
-__device__ float calcOffsetValue(float Value1, float Value2, float ValueDesired)
+__device__ void calcOffsetValue(float isolevel, float3 p0, float3 p1, float4 f0, float4 f1, float3& p)
 {
-    if ((Value2 - Value1) == 0.0f)
-        return 0.5f;
-
-    return (ValueDesired - Value1) / (Value2 - Value1);
+    float t = (isolevel - f0.w) / (f1.w - f0.w);
+    p = p0 + t * (p1 - p0);
 }
+
 
 // classify voxel
 __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridSize,
-    uint numVoxels, float3 basePoint, float3 voxelSize,
-    float isoValue, float3* samplePts, uint sampleLength)
+    uint numVoxels, float3 basePoint, float3 voxelSize, float isoValue)
 {
     uint blockId = blockIdx.y * gridDim.x + blockIdx.x;
     uint i = blockId * blockDim.x + threadIdx.x;
@@ -61,14 +63,14 @@ __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridS
     p.y = basePoint.y + gridPos.y * voxelSize.y;
     p.z = basePoint.z + gridPos.z * voxelSize.z;
 
-    float field0 = computeValue(samplePts, p, sampleLength);
-    float field1 = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, 0 + p.z), sampleLength);
-    float field2 = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    float field3 = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    float field4 = computeValue(samplePts, make_float3(0 + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    float field5 = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    float field6 = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
-    float field7 = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
+    float field0 = computeValue(p);
+    float field1 = computeValue(make_float3(voxelSize.x + p.x, 0.0f + p.y, 0.0f + p.z));
+    float field2 = computeValue(make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0.0f + p.z));
+    float field3 = computeValue(make_float3(0.0f + p.x, voxelSize.y + p.y, 0.0f + p.z));
+    float field4 = computeValue(make_float3(0.0f + p.x, 0.0f + p.y, voxelSize.z + p.z));
+    float field5 = computeValue(make_float3(voxelSize.x + p.x, 0.0f + p.y, voxelSize.z + p.z));
+    float field6 = computeValue(make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
+    float field7 = computeValue(make_float3(0.0f + p.x, voxelSize.y + p.y, voxelSize.z + p.z));
 
     // calculate flag indicating if each vertex is inside or outside isosurface
     uint cubeindex;
@@ -84,13 +86,10 @@ __global__ void classifyVoxel(uint* voxelVerts, uint* voxelOccupied, uint3 gridS
     // read number of vertices from texture
     uint numVerts = numVertsTable[cubeindex];
 
-    if (i < numVoxels)
+    voxelVerts[i] = numVerts;
+    if ((numVerts > 0))
     {
-        voxelVerts[i] = numVerts;
-        if ((numVerts > 0))
-        {
-            voxelOccupied[i] = 1;
-        }
+        voxelOccupied[i] = 1;
     }
 }
 
@@ -107,8 +106,7 @@ __global__ void compactVoxels(uint* compactedVoxelArray, uint* voxelOccupied, ui
 }
 
 __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uint* numVertsScanned,
-    uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
-    float3* samplePts, uint sampleLength)
+    uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue)
 {
     uint blockId = __mul24(blockIdx.y, gridDim.x) + blockIdx.x;
     uint i = __mul24(blockId, blockDim.x) + threadIdx.x;
@@ -121,92 +119,53 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     p.y = basePoint.y + gridPos.y * voxelSize.y;
     p.z = basePoint.z + gridPos.z * voxelSize.z;
 
-    float field[8];
-    field[0] = computeValue(samplePts, p, sampleLength);
-    field[1] = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, 0 + p.z), sampleLength);
-    field[2] = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    field[3] = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, 0 + p.z), sampleLength);
-    field[4] = computeValue(samplePts, make_float3(0 + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    field[5] = computeValue(samplePts, make_float3(voxelSize.x + p.x, 0 + p.y, voxelSize.z + p.z), sampleLength);
-    field[6] = computeValue(samplePts, make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
-    field[7] = computeValue(samplePts, make_float3(0 + p.x, voxelSize.y + p.y, voxelSize.z + p.z), sampleLength);
+    float3 v[8];
+    v[0] = p;
+    v[1] = make_float3(voxelSize.x + p.x, 0.0f + p.y, 0.0f + p.z);
+    v[2] = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0.0f + p.z);
+    v[3] = make_float3(0.0f + p.x, voxelSize.y + p.y, 0.0f + p.z);
+    v[4] = make_float3(0.0f + p.x, 0.0f + p.y, voxelSize.z + p.z);
+    v[5] = make_float3(voxelSize.x + p.x, 0.0f + p.y, voxelSize.z + p.z);
+    v[6] = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+    v[7] = make_float3(0.0f + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+
+    float4 field[8];
+    field[0] = computeValue4(v[0]);
+    field[1] = computeValue4(v[1]);
+    field[2] = computeValue4(v[2]);
+    field[3] = computeValue4(v[3]);
+    field[4] = computeValue4(v[4]);
+    field[5] = computeValue4(v[5]);
+    field[6] = computeValue4(v[6]);
+    field[7] = computeValue4(v[7]);
 
     // calculate flag indicating if each vertex is inside or outside isosurface
     uint cubeindex;
-    cubeindex = uint(field[0] < isoValue);
-    cubeindex += uint(field[1] < isoValue) * 2;
-    cubeindex += uint(field[2] < isoValue) * 4;
-    cubeindex += uint(field[3] < isoValue) * 8;
-    cubeindex += uint(field[4] < isoValue) * 16;
-    cubeindex += uint(field[5] < isoValue) * 32;
-    cubeindex += uint(field[6] < isoValue) * 64;
-    cubeindex += uint(field[7] < isoValue) * 128;
+    cubeindex = uint(field[0].w < isoValue);
+    cubeindex += uint(field[1].w < isoValue) * 2;
+    cubeindex += uint(field[2].w < isoValue) * 4;
+    cubeindex += uint(field[3].w < isoValue) * 8;
+    cubeindex += uint(field[4].w < isoValue) * 16;
+    cubeindex += uint(field[5].w < isoValue) * 32;
+    cubeindex += uint(field[6].w < isoValue) * 64;
+    cubeindex += uint(field[7].w < isoValue) * 128;
 
     float3 vertlist[12];
     float offsetV[12];
 
-    //compute t values from two end points on each edge
-    offsetV[0] = calcOffsetValue(field[0], field[1], isoValue);
-    offsetV[1] = calcOffsetValue(field[1], field[2], isoValue);
-    offsetV[2] = calcOffsetValue(field[2], field[3], isoValue);
-    offsetV[3] = calcOffsetValue(field[3], field[0], isoValue);
-    offsetV[4] = calcOffsetValue(field[4], field[5], isoValue);
-    offsetV[5] = calcOffsetValue(field[5], field[6], isoValue);
-    offsetV[6] = calcOffsetValue(field[6], field[7], isoValue);
-    offsetV[7] = calcOffsetValue(field[7], field[4], isoValue);
-    offsetV[8] = calcOffsetValue(field[0], field[4], isoValue);
-    offsetV[9] = calcOffsetValue(field[1], field[5], isoValue);
-    offsetV[10] = calcOffsetValue(field[2], field[6], isoValue);
-    offsetV[11] = calcOffsetValue(field[3], field[7], isoValue);
-
     // compute the position of all vertices
-    vertlist[0].x = basePoint.x + (gridPos.x + 0.0f + offsetV[0] * 1.0f) * scale;
-    vertlist[0].y = basePoint.y + (gridPos.y + 0.0f + offsetV[0] * 0.0f) * scale;
-    vertlist[0].z = basePoint.z + (gridPos.z + 0.0f + offsetV[0] * 0.0f) * scale;
-
-    vertlist[1].x = basePoint.x + (gridPos.x + 1.0f + offsetV[1] * 0.0f) * scale;
-    vertlist[1].y = basePoint.y + (gridPos.y + 0.0f + offsetV[1] * 1.0f) * scale;
-    vertlist[1].z = basePoint.z + (gridPos.z + 0.0f + offsetV[1] * 0.0f) * scale;
-
-    vertlist[2].x = basePoint.x + (gridPos.x + 1.0f + offsetV[2] * -1.0f) * scale;
-    vertlist[2].y = basePoint.y + (gridPos.y + 1.0f + offsetV[2] * 0.0f) * scale;
-    vertlist[2].z = basePoint.z + (gridPos.z + 0.0f + offsetV[2] * 0.0f) * scale;
-
-    vertlist[3].x = basePoint.x + (gridPos.x + 0.0f + offsetV[3] * 0.0f) * scale;
-    vertlist[3].y = basePoint.y + (gridPos.y + 1.0f + offsetV[3] * -1.0f) * scale;
-    vertlist[3].z = basePoint.z + (gridPos.z + 0.0f + offsetV[3] * 0.0f) * scale;
-
-    vertlist[4].x = basePoint.x + (gridPos.x + 0.0f + offsetV[4] * 1.0f) * scale;
-    vertlist[4].y = basePoint.y + (gridPos.y + 0.0f + offsetV[4] * 0.0f) * scale;
-    vertlist[4].z = basePoint.z + (gridPos.z + 1.0f + offsetV[4] * 0.0f) * scale;
-
-    vertlist[5].x = basePoint.x + (gridPos.x + 1.0f + offsetV[5] * 0.0f) * scale;
-    vertlist[5].y = basePoint.y + (gridPos.y + 0.0f + offsetV[5] * 1.0f) * scale;
-    vertlist[5].z = basePoint.z + (gridPos.z + 1.0f + offsetV[5] * 0.0f) * scale;
-
-    vertlist[6].x = basePoint.x + (gridPos.x + 1.0f + offsetV[6] * -1.0f) * scale;
-    vertlist[6].y = basePoint.y + (gridPos.y + 1.0f + offsetV[6] * 0.0f) * scale;
-    vertlist[6].z = basePoint.z + (gridPos.z + 1.0f + offsetV[6] * 0.0f) * scale;
-
-    vertlist[7].x = basePoint.x + (gridPos.x + 0.0f + offsetV[7] * 0.0f) * scale;
-    vertlist[7].y = basePoint.y + (gridPos.y + 1.0f + offsetV[7] * -1.0f) * scale;
-    vertlist[7].z = basePoint.z + (gridPos.z + 1.0f + offsetV[7] * 0.0f) * scale;
-
-    vertlist[8].x = basePoint.x + (gridPos.x + 0.0f + offsetV[8] * 0.0f) * scale;
-    vertlist[8].y = basePoint.y + (gridPos.y + 0.0f + offsetV[8] * 0.0f) * scale;
-    vertlist[8].z = basePoint.z + (gridPos.z + 0.0f + offsetV[8] * 1.0f) * scale;
-
-    vertlist[9].x = basePoint.x + (gridPos.x + 1.0f + offsetV[9] * 0.0f) * scale;
-    vertlist[9].y = basePoint.y + (gridPos.y + 0.0f + offsetV[9] * 0.0f) * scale;
-    vertlist[9].z = basePoint.z + (gridPos.z + 0.0f + offsetV[9] * 1.0f) * scale;
-
-    vertlist[10].x = basePoint.x + (gridPos.x + 1.0f + offsetV[10] * 0.0f) * scale;
-    vertlist[10].y = basePoint.y + (gridPos.y + 1.0f + offsetV[10] * 0.0f) * scale;
-    vertlist[10].z = basePoint.z + (gridPos.z + 0.0f + offsetV[10] * 1.0f) * scale;
-
-    vertlist[11].x = basePoint.x + (gridPos.x + 0.0f + offsetV[11] * 0.0f) * scale;
-    vertlist[11].y = basePoint.y + (gridPos.y + 1.0f + offsetV[11] * 0.0f) * scale;
-    vertlist[11].z = basePoint.z + (gridPos.z + 0.0f + offsetV[11] * 1.0f) * scale;
+    calcOffsetValue(isoValue, v[0], v[1], field[0], field[1], vertlist[0]);
+    calcOffsetValue(isoValue, v[1], v[2], field[1], field[2], vertlist[1]);
+    calcOffsetValue(isoValue, v[2], v[3], field[2], field[3], vertlist[2]);
+    calcOffsetValue(isoValue, v[3], v[0], field[3], field[0], vertlist[3]);
+    calcOffsetValue(isoValue, v[4], v[5], field[4], field[5], vertlist[4]);
+    calcOffsetValue(isoValue, v[5], v[6], field[5], field[6], vertlist[5]);
+    calcOffsetValue(isoValue, v[6], v[7], field[6], field[7], vertlist[6]);
+    calcOffsetValue(isoValue, v[7], v[4], field[7], field[4], vertlist[7]);
+    calcOffsetValue(isoValue, v[0], v[4], field[0], field[4], vertlist[8]);
+    calcOffsetValue(isoValue, v[1], v[5], field[1], field[5], vertlist[9]);
+    calcOffsetValue(isoValue, v[2], v[6], field[2], field[6], vertlist[10]);
+    calcOffsetValue(isoValue, v[3], v[7], field[3], field[7], vertlist[11]);
 
     // read number of vertices from texture
     uint numVerts = numVertsTable[cubeindex];
@@ -225,13 +184,11 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
 
 
 extern "C" void launch_classifyVoxel(dim3 grid, dim3 threads, uint * voxelVerts, uint * voxelOccupied, uint3 gridSize,
-    uint numVoxels, float3 basePoint, float3 voxelSize,
-    float isoValue, float3 * samplePts, uint sampleLength)
+    uint numVoxels, float3 basePoint, float3 voxelSize, float isoValue)
 {
     // calculate number of vertices need per voxel
     classifyVoxel << <grid, threads >> > (voxelVerts, voxelOccupied, gridSize,
-        numVoxels, basePoint, voxelSize,
-        isoValue, samplePts, sampleLength);
+        numVoxels, basePoint, voxelSize, isoValue);
     getLastCudaError("classifyVoxel failed");
 }
 
@@ -251,12 +208,10 @@ extern "C" void exclusiveSumScan(uint * output, uint * input, uint numElements)
 
 extern "C" void launch_extractIsosurface(dim3 grid, dim3 threads,
     float3 * result, uint * compactedVoxelArray, uint * numVertsScanned,
-    uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue, float scale,
-    float3 * samplePts, uint sampleLength)
+    uint3 gridSize, float3 basePoint, float3 voxelSize, float isoValue)
 {
     extractIsosurface << <grid, threads >> > (result, compactedVoxelArray, numVertsScanned,
-        gridSize, basePoint, voxelSize, isoValue, scale,
-        samplePts, sampleLength);
+        gridSize, basePoint, voxelSize, isoValue);
     getLastCudaError("extract Isosurface failed");
 }
 #pragma endregion

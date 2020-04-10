@@ -8,7 +8,7 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Grasshopper.Kernel.Types.Transforms;
 
-namespace ALG_MarchingCubes
+namespace ALG.MarchingCubes
 {
     public class BasicFunctions
     {

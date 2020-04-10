@@ -1,26 +1,28 @@
 ## Introduction
 
-ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper using [Marching Cubes algorithm](https://en.wikipedia.org/wiki/Marching_cubes) on GPU. It provides two versions——C# ([Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)) and C++ ([CUDA v10.2](https://developer.nvidia.com/cuda-downloads)), to implement Marching Cubes on GPU. The development of this project is an important learning experience for me. I hope it can be a parallel programming reference case which can help GPU programming beginners and Grasshopper developers.
+ALG_MarchingCubes_GPU is an isosurface extraction plug-in for Grasshopper using [Marching Cubes algorithm](https://en.wikipedia.org/wiki/Marching_cubes) on GPU. The development of this project is an important learning experience for me. I hope it can be a parallel programming reference case which can help GPU programming beginners and Grasshopper developers.
 
-At present, its computational performance can still be optimized (e.g. 99% of computing time is spent on the memory copy). I will continue to improve it in my future work.
+At present, its computational performance can still be optimized. I will continue to improve it in my future work.
 
 ![](https://albertlidesign.github.io/post-images/1586082938627.png)
 
-## Installation
+## Algorithm
 
-### Alea GPU
+1. Compute bounding box from input points. 
 
-To compile the c# version, you need to install [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/).  Alea GPU requires a CUDA-capable GPU with **compute capability 2.0** or higher. Alea GPU consists of several assemblies, tools and resources, organized in multiple [NuGet packages](http://www.nuget.org/profiles/quantalea). So you can install them directly through Visual Studio. 
+2. Generation of a voxel-based grid inside the box. 
 
-It is important to note that you also need to install **FSharp.Core** package and **CUDA v9.0** (CUDA v10.2 is not supported) before using Alea GPU in C#.
+3. Classify voxels: Mark all the active voxels to get an active voxels array and calculate the number of vertices in each voxel by looking up vertices table. It is executed using one thread per voxel.
 
-If you want to learn more about Alea GPU, please check the web site [Alea GPU](http://www.aleagpu.com/release/3_0_4/doc/)
+4. Exclusive sum scan:  Get the total number of active voxels and the total number of resulting vertices using exclusive scan algorithm. They are obtained by the sum of the last value of the exclusive scan and the last value of input array.
 
-![](https://albertlidesign.github.io/post-images/1586082600760.png)
+5. Compact voxels: This compacts the active voxels array to get rid of empty voxels. This allows us to execute Isosurface Extraction on only the active voxels.
 
-### CUDA
+6. Isosurface extraction: Calculate the position of the points in the active voxel and obtain all the result points by looking up triangle table.
 
-To compile the c++ version, you need to install [CUDA v10.2](https://developer.nvidia.com/cuda-downloads). 
+7. Generate a mesh model from result points.
+
+   
 
 ## Performance
 
@@ -30,17 +32,17 @@ To compile the c++ version, you need to install [CUDA v10.2](https://developer.n
 
 [1] Dyken, C., Ziegler, G., Theobalt, C., & Seidel, H. P. (2008, December). High‐speed marching cubes using histopyramids. In Computer Graphics Forum (Vol. 27, No. 8, pp. 2028-2039). Oxford, UK: Blackwell Publishing Ltd.
 
-[2] Lorensen W E, Cline H E. Marching cubes: A high resolution 3D surface construction algorithm. ACM SIGGRAPH Computer Graphics. 1987;21(4)
+[2] Congote, J., Moreno, A., Barandiaran, I., Barandiaran, J., Posada, J., & Ruiz, O. (2010). Marching cubes in an unsigned distance field for surface reconstruction from unorganized point sets. In *Proceedings of the International Conference on Computer Graphics Theory and Applications, vol. 1, pp. 143,147, 2010*.
 
-[3] C. Dyken, G. Ziegler, C. Theobalt, and H.-P. Seidel. High-speed Marching Cubes using HistoPyramids. Computer Graphics Forum, 27(8):2028–2039, Dec. 2008.
+[3] Lorensen W E, Cline H E. Marching cubes: A high resolution 3D surface construction algorithm. ACM SIGGRAPH Computer Graphics. 1987;21(4)
 
-[4] The algorithm and lookup tables by Paul Bourke httppaulbourke.netgeometrypolygonise：http://paulbourke.net/geometry/polygonise/
+[4] C. Dyken, G. Ziegler, C. Theobalt, and H.-P. Seidel. High-speed Marching Cubes using HistoPyramids. Computer Graphics Forum, 27(8):2028–2039, Dec. 2008.
 
-[5] Marching Cubes implementation using OpenCL and OpenGL：https://www.eriksmistad.no/marching-cubes-implementation-using-opencl-and-opengl/
+[5] The algorithm and lookup tables by Paul Bourke httppaulbourke.netgeometrypolygonise：http://paulbourke.net/geometry/polygonise/
 
-[6] A sample extracts a geometric isosurface from a volume dataset using the marching cubes algorithm.: https://github.com/tpn/cuda-samples/tree/master/v10.2/2_Graphics/marchingCubes
+[6] Marching Cubes implementation using OpenCL and OpenGL：https://www.eriksmistad.no/marching-cubes-implementation-using-opencl-and-opengl/
 
-[7] Samples and C# GPU Programming tutorials for Alea GPU Developers: http://www.aleagpu.com/release/3_0_4/doc/
+[7] A sample extracts a geometric isosurface from a volume dataset using the marching cubes algorithm.: https://github.com/tpn/cuda-samples/tree/master/v10.2/2_Graphics/marchingCubes
 
 [8] The introduction of marching cubes: http://www.cs.carleton.edu/cs_comps/0405/shape/marching_cubes.html
 

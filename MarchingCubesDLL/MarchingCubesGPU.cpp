@@ -18,28 +18,18 @@
 #include<time.h>
 
 extern "C" __declspec(dllexport)  bool computMC(cfloat3 bP, cfloat3 vS,
-    int xCount, int yCount, int zCount, float s, float iso, cfloat3 * samplePoints,
-    int sampleCount, size_t & resultLength);
+    int xCount, int yCount, int zCount, float iso,  size_t & resultLength);
 extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
 
-bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-    float s, float iso, cfloat3* samplePoints, int sampleCount, size_t& resultLength)
+bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,  float iso, size_t& resultLength)
 {
     bool successful = true;
 
-    sampleLength = sampleCount;
     basePoint = Convert(bP);
-    voxelSize = Convert(vS);
     gridSize = make_uint3(xCount, yCount, zCount);
     numVoxels = xCount * yCount * zCount;
-    scale = s;
+    voxelSize = Convert(vS);
     isoValue = iso;
-
-    samplePts = new float3[sampleCount];
-    for (int i = 0; i < sampleCount; i++)
-    {
-        samplePts[i] = Convert(samplePoints[i]);
-    }
 
     initMC();
 
@@ -57,7 +47,7 @@ bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     // calculate number of vertices need per voxel
     launch_classifyVoxel(grid, threads,
         d_voxelVerts, d_voxelOccupied, gridSize,
-        numVoxels, basePoint, voxelSize, isoValue, d_samplePts, sampleLength);
+        numVoxels, basePoint, voxelSize, isoValue);
 #pragma endregion
 
     /*
@@ -128,8 +118,7 @@ bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
     }
 
     launch_extractIsosurface(grid2, threads, d_result, d_compVoxelArray, d_voxelVertsScan,
-        gridSize, basePoint, voxelSize,
-        isoValue, scale, d_samplePts, sampleLength);
+        gridSize, basePoint, voxelSize, isoValue);
 
     resultPts = new float3[num_resultVertices];
     checkCudaErrors(cudaMemcpy(resultPts,
@@ -152,65 +141,6 @@ void getResult(cfloat3* results)
     delete[] resultPts;
 }
 
-// Load arguments
-float3* loadFile(string filename)
-{
-    ifstream inFile;
-
-    inFile.open(filename);
-    if (inFile) {
-        cout << "pts.txt open scessful" << endl;
-
-        string s;
-        getline(inFile, s);
-        sampleLength = stoi(s);
-
-        float bf1, bf2, bf3;
-        inFile >> bf1 >> bf2 >> bf3;
-        basePoint = make_float3(bf1, bf2, bf3);
-
-        inFile >> scale >> isoValue;
-        voxelSize = make_float3(scale, scale, scale);
-
-        int xCount, yCount, zCount;
-        inFile >> xCount >> yCount >> zCount;
-        gridSize = make_uint3(xCount, yCount, zCount);
-        numVoxels = xCount * yCount * zCount;
-
-        samplePts = new float3[sampleLength * sizeof(float3)];
-        int i = 0;
-        float f1, f2, f3;
-        while (inFile >> f1 >> f2 >> f3)
-        {
-            samplePts[i] = make_float3(f1, f2, f3);
-            i++;
-        }
-
-        inFile.close();
-        return samplePts;
-    }
-    else
-    {
-        cout << "endless.txt doesn't exist" << endl;
-        float3* samplePts = new float3[sampleLength];
-        return samplePts;
-    }
-}
-void writeFile(string filename)
-{
-    ofstream outFile;
-    outFile.open(filename);
-    if (outFile.is_open())
-    {
-        for (size_t i = 0; i < num_resultVertices; i++)
-        {
-            outFile << resultPts[i].x << '\t' << resultPts[i].y << '\t' << resultPts[i].z << endl;
-        }
-
-        outFile.close();
-    }
-}
-
 
 void initMC()
 {
@@ -219,9 +149,6 @@ void initMC()
     checkCudaErrors(cudaMalloc((void**)&d_voxelVertsScan, memSize));
     checkCudaErrors(cudaMalloc((void**)&d_voxelOccupiedScan, memSize));
     checkCudaErrors(cudaMalloc((void**)&d_compVoxelArray, memSize));
-    // allocate sample points and copy them to device
-    checkCudaErrors(cudaMalloc((void**)&d_samplePts, sampleLength * sizeof(float3)));
-    cudaMemcpy(d_samplePts, samplePts, sampleLength * sizeof(float3), cudaMemcpyHostToDevice);
 
     // allocate pinned memory
     cudaError_t status = cudaMallocHost((void**)&d_voxelOccupied, memSize);
@@ -236,16 +163,9 @@ void cleanup()
 {
     checkCudaErrors(cudaFree(d_result));
 
-    checkCudaErrors(cudaFree(d_edgeTable));
-    checkCudaErrors(cudaFree(d_triTable));
-    checkCudaErrors(cudaFree(d_numVertsTable));
-
     checkCudaErrors(cudaFree(d_voxelVertsScan));
     checkCudaErrors(cudaFree(d_voxelOccupiedScan));
     checkCudaErrors(cudaFree(d_compVoxelArray));
-
-    checkCudaErrors(cudaFree(d_samplePts));
-    delete[] samplePts;
 }
 
 

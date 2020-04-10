@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Rhino.Geometry;
 
-namespace ALG_MarchingCubes.Based_on_CUDA
+namespace ALG.MarchingCubes
 {
     [StructLayout(LayoutKind.Sequential)]
     struct cfloat3
@@ -16,49 +16,36 @@ namespace ALG_MarchingCubes.Based_on_CUDA
     class ExtractIsosurface
     {
         public Point3d basePoint;
-        public Point3d voxelSize;
         public int xCount;
         public int yCount;
         public int zCount;
-        public float scale;
         public float isoValue;
         public List<Point3d> samplePoints;
 
         public ExtractIsosurface() { }
-        public ExtractIsosurface(Point3d basePoint, int xCount, int yCount, int zCount, Point3d voxelSize,
-            float scale, float isoValue, List<Point3d> samplePoints)
+        public ExtractIsosurface(Point3d basePoint, int xCount, int yCount, int zCount, float isoValue)
         {
             this.basePoint = basePoint;
             this.xCount = xCount;
             this.yCount = yCount;
             this.zCount = zCount;
-            this.voxelSize = voxelSize;
-            this.scale = scale;
             this.isoValue = isoValue;
-            this.samplePoints = samplePoints;
         }
 
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "computMC")]
-        public static extern bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,
-            float s, float iso, cfloat3[] samplePoints, int sampleCount,  ref uint resultLength);
+        public static extern bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount, float iso,  ref uint resultLength);
         [DllImport("MarchingCubesDLL.dll", EntryPoint = "getResult")]
         public static extern void getResult(IntPtr result);
-
-        [DllImport("MarchingCubesDLL.dll", EntryPoint = "freeMemory")]
-        public static extern void freeMemory(IntPtr a);
-        public bool runIsosurface(ref List<Point3d> vertices, ref int num_activeVoxels)
+        public bool runIsosurface(float x, float y, float z, ref List<Point3d> vertices, ref int num_activeVoxels)
         {
-            int sampleCount = samplePoints.Count();
             cfloat3 bP = ConvertPtToFloat3(basePoint);
-            cfloat3 vS = ConvertPtToFloat3(voxelSize);           
-            cfloat3[] smaplePts = new cfloat3[sampleCount];
-            for (int i = 0; i < sampleCount; i++)
-            {
-                smaplePts[i] = ConvertPtToFloat3(samplePoints[i]);
-            }
+            cfloat3 vS = new cfloat3();
+            vS.x = x;
+            vS.y = y;
+            vS.z = z;
 
             uint resultLength = 0;
-            bool successful = computMC(bP, vS, xCount, yCount, zCount, scale, isoValue, smaplePts, sampleCount, ref resultLength);
+            bool successful = computMC(bP, vS, xCount, yCount, zCount, isoValue, ref resultLength);
 
             if (successful == false)
             {
