@@ -119,53 +119,51 @@ __global__ void extractIsosurface(float3* result, uint* compactedVoxelArray, uin
     p.y = basePoint.y + gridPos.y * voxelSize.y;
     p.z = basePoint.z + gridPos.z * voxelSize.z;
 
-    float3 v[8];
-    v[0] = p;
-    v[1] = make_float3(voxelSize.x + p.x, 0.0f + p.y, 0.0f + p.z);
-    v[2] = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0.0f + p.z);
-    v[3] = make_float3(0.0f + p.x, voxelSize.y + p.y, 0.0f + p.z);
-    v[4] = make_float3(0.0f + p.x, 0.0f + p.y, voxelSize.z + p.z);
-    v[5] = make_float3(voxelSize.x + p.x, 0.0f + p.y, voxelSize.z + p.z);
-    v[6] = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
-    v[7] = make_float3(0.0f + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+    float3 v0 = p;
+    float3 v1 = make_float3(voxelSize.x + p.x, 0.0f + p.y, 0.0f + p.z);
+    float3 v2 = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, 0.0f + p.z);
+    float3 v3 = make_float3(0.0f + p.x, voxelSize.y + p.y, 0.0f + p.z);
+    float3 v4 = make_float3(0.0f + p.x, 0.0f + p.y, voxelSize.z + p.z);
+    float3 v5 = make_float3(voxelSize.x + p.x, 0.0f + p.y, voxelSize.z + p.z);
+    float3 v6 = make_float3(voxelSize.x + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
+    float3 v7 = make_float3(0.0f + p.x, voxelSize.y + p.y, voxelSize.z + p.z);
 
-    float4 field[8];
-    field[0] = computeValue4(v[0]);
-    field[1] = computeValue4(v[1]);
-    field[2] = computeValue4(v[2]);
-    field[3] = computeValue4(v[3]);
-    field[4] = computeValue4(v[4]);
-    field[5] = computeValue4(v[5]);
-    field[6] = computeValue4(v[6]);
-    field[7] = computeValue4(v[7]);
+   float4 field0 = computeValue4(v0);
+   float4 field1 = computeValue4(v1);
+   float4 field2 = computeValue4(v2);
+   float4 field3 = computeValue4(v3);
+   float4 field4 = computeValue4(v4);
+   float4 field5 = computeValue4(v5);
+   float4 field6 = computeValue4(v6);
+   float4 field7 = computeValue4(v7);
 
     // calculate flag indicating if each vertex is inside or outside isosurface
     uint cubeindex;
-    cubeindex = uint(field[0].w < isoValue);
-    cubeindex += uint(field[1].w < isoValue) * 2;
-    cubeindex += uint(field[2].w < isoValue) * 4;
-    cubeindex += uint(field[3].w < isoValue) * 8;
-    cubeindex += uint(field[4].w < isoValue) * 16;
-    cubeindex += uint(field[5].w < isoValue) * 32;
-    cubeindex += uint(field[6].w < isoValue) * 64;
-    cubeindex += uint(field[7].w < isoValue) * 128;
+    cubeindex = uint(field0.w < isoValue);
+    cubeindex += uint(field1.w < isoValue) * 2;
+    cubeindex += uint(field2.w < isoValue) * 4;
+    cubeindex += uint(field3.w < isoValue) * 8;
+    cubeindex += uint(field4.w < isoValue) * 16;
+    cubeindex += uint(field5.w < isoValue) * 32;
+    cubeindex += uint(field6.w < isoValue) * 64;
+    cubeindex += uint(field7.w < isoValue) * 128;
 
     float3 vertlist[12];
     float offsetV[12];
 
     // compute the position of all vertices
-    calcOffsetValue(isoValue, v[0], v[1], field[0], field[1], vertlist[0]);
-    calcOffsetValue(isoValue, v[1], v[2], field[1], field[2], vertlist[1]);
-    calcOffsetValue(isoValue, v[2], v[3], field[2], field[3], vertlist[2]);
-    calcOffsetValue(isoValue, v[3], v[0], field[3], field[0], vertlist[3]);
-    calcOffsetValue(isoValue, v[4], v[5], field[4], field[5], vertlist[4]);
-    calcOffsetValue(isoValue, v[5], v[6], field[5], field[6], vertlist[5]);
-    calcOffsetValue(isoValue, v[6], v[7], field[6], field[7], vertlist[6]);
-    calcOffsetValue(isoValue, v[7], v[4], field[7], field[4], vertlist[7]);
-    calcOffsetValue(isoValue, v[0], v[4], field[0], field[4], vertlist[8]);
-    calcOffsetValue(isoValue, v[1], v[5], field[1], field[5], vertlist[9]);
-    calcOffsetValue(isoValue, v[2], v[6], field[2], field[6], vertlist[10]);
-    calcOffsetValue(isoValue, v[3], v[7], field[3], field[7], vertlist[11]);
+    calcOffsetValue(isoValue, v0, v1, field0, field1, vertlist[0]);
+    calcOffsetValue(isoValue, v1, v2, field1, field2, vertlist[1]);
+    calcOffsetValue(isoValue, v2, v3, field2, field3, vertlist[2]);
+    calcOffsetValue(isoValue, v3, v0, field3, field0, vertlist[3]);
+    calcOffsetValue(isoValue, v4, v5, field4, field5, vertlist[4]);
+    calcOffsetValue(isoValue, v5, v6, field5, field6, vertlist[5]);
+    calcOffsetValue(isoValue, v6, v7, field6, field7, vertlist[6]);
+    calcOffsetValue(isoValue, v7, v4, field7, field4, vertlist[7]);
+    calcOffsetValue(isoValue, v0, v4, field0, field4, vertlist[8]);
+    calcOffsetValue(isoValue, v1, v5, field1, field5, vertlist[9]);
+    calcOffsetValue(isoValue, v2, v6, field2, field6, vertlist[10]);
+    calcOffsetValue(isoValue, v3, v7, field3, field7, vertlist[11]);
 
     // read number of vertices from texture
     uint numVerts = numVertsTable[cubeindex];

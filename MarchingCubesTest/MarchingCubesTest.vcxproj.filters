@@ -15,21 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="tables.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="MarchingCubesGPU.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="MarchingCubesGPU.cpp">
+    <ClCompile Include="MarchingCubesTest.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="kernels.cu">
+    <CudaCompile Include="..\MarchingCubesDLL\kernels.cu">
       <Filter>源文件</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\MarchingCubesDLL\tables.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MarchingCubesDLL\MarchingCubesGPU.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

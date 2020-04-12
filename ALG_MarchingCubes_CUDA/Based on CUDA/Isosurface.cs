@@ -28,6 +28,7 @@ namespace ALG.MarchingCubes
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddMeshParameter("Mesh", "M", "Extract isosurface.", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Time", "T", "time", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -37,6 +38,9 @@ namespace ALG.MarchingCubes
             int xCount = 0, yCount = 0, zCount = 0;
             double isovalue = 5.0;
 
+            List<double> time = new List<double>();
+            Stopwatch sw = new Stopwatch();
+
             DA.GetData("Box", ref box1);
             DA.GetData("X", ref xCount);
             DA.GetData("Y", ref yCount);
@@ -44,7 +48,13 @@ namespace ALG.MarchingCubes
             DA.GetData("Isovalue", ref isovalue);
             #endregion
 
+            sw.Start();
             #region initialization
+            if (xCount<2 || yCount<2 || zCount <2)
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "The number of voxels on some axis is too small.");
+                return;
+            }
             Interval xD = box1.X;
             Interval yD = box1.Y;
             Interval zD = box1.Z;
@@ -64,9 +74,12 @@ namespace ALG.MarchingCubes
 
             var isoSurface = new ExtractIsosurface(baseP, xCount, yCount, zCount, (float)isovalue);
             #endregion
+            sw.Stop();
+            double ta = sw.Elapsed.TotalMilliseconds;
 
             int num_activeVoxels = 0, num_Voxels = xCount*yCount*zCount;
             List<Point3d> resultPts = new List<Point3d>();
+            sw.Restart();
             bool successful = isoSurface.runIsosurface(xSize,ySize, zSize, ref resultPts,  ref num_activeVoxels);
 
             if (successful == false)
@@ -75,14 +88,24 @@ namespace ALG.MarchingCubes
                 return;
             }
             this.Message = num_Voxels.ToString();
+            sw.Stop();
+            double tb = sw.Elapsed.TotalMilliseconds;
             // extract the mesh from result vertices
 
+            sw.Restart();
             Mesh mesh = BasicFunctions.ExtractMesh(resultPts);
             //mesh.Faces.CullDegenerateFaces();
             mesh.FaceNormals.ComputeFaceNormals();
             mesh.Normals.ComputeNormals();
 
+            sw.Stop();
+            double tc = sw.Elapsed.TotalMilliseconds;
+
+            time.Add(tb);
+            time.Add(tc);
+
             DA.SetData("Mesh", mesh);
+            DA.SetDataList("Time", time);
         }
 
         protected override Bitmap Icon => null;

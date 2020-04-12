@@ -13,15 +13,41 @@
 #include <helper_cuda.h>
 #include <helper_functions.h>
 
-#include "MarchingCubesGPU.h"
+#include "..\MarchingCubesDLL\MarchingCubesGPU.h"
 
 #include<time.h>
 
-extern "C" __declspec(dllexport)  bool computMC(cfloat3 bP, cfloat3 vS,
-    int xCount, int yCount, int zCount, float iso,  size_t & resultLength);
-extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
+//extern "C" __declspec(dllexport)  bool computMC(cfloat3 bP, cfloat3 vS,
+//    int xCount, int yCount, int zCount, float iso,  size_t & resultLength);
+//extern "C" __declspec(dllexport)  void getResult(cfloat3 * result);
 
-bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,  float iso, size_t& resultLength)
+bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount, float iso, size_t& resultLength);
+void getResult(cfloat3* result);
+
+int main()
+{
+    cfloat3 bP, vS;
+    bP.x = 34;
+    bP.y = -30;
+    bP.z = 0;
+
+    int xCount = 50;
+    int yCount = 77;
+    int zCount = 41;
+
+    vS.x =0.54;
+    vS.y = 0.337;
+    vS.z = 0.512;
+
+    float iso = 0.31;
+
+    size_t resultLength;
+    computMC(bP, vS, xCount, yCount, zCount, iso, resultLength);
+    cout << resultPts[0].x << '\t' << resultPts[1].y << '\t' << resultPts[2].z << endl;
+    return 0;
+}
+
+bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount, float iso, size_t& resultLength)
 {
     bool successful = true;
 
@@ -34,7 +60,7 @@ bool computMC(cfloat3 bP, cfloat3 vS, int xCount, int yCount, int zCount,  float
     initMC();
 
 #pragma region Classify all voxels
-    int threads = 128;
+    int threads = 256;
     dim3 grid((numVoxels + threads - 1) / threads, 1, 1);
 
     // get around maximum grid size of 65535 in each dimension
